@@ -3,7 +3,7 @@ import { getPerspectiveView } from '../primitives/getPerspectiveView.js';
 import { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 
 export const schema = z.object({
-  perspectiveName: z.string().describe("Name of the perspective to view (e.g., 'Inbox', 'Projects', 'Flagged', or custom perspective name)"),
+  perspectiveName: z.string().describe("Name of the perspective to view. Built-in: 'Inbox', 'Projects', 'Tags', 'Flagged', 'Forecast', 'Review'. Custom perspective names are also accepted but may return limited results."),
   
   limit: z.number().optional().describe("Maximum number of items to return. Default: 100"),
   
@@ -23,12 +23,19 @@ export async function handler(args: z.infer<typeof schema>, extra: RequestHandle
     
     if (result.success) {
       const items = result.items || [];
-      
+
       // Format the output
       let output = `## ${args.perspectiveName} Perspective (${items.length} items)\n\n`;
-      
-      if (items.length === 0) {
+
+      // Show note if present (e.g., for custom perspectives)
+      if (result.note) {
+        output += `> ${result.note}\n\n`;
+      }
+
+      if (items.length === 0 && !result.note) {
         output += "No items visible in this perspective.";
+      } else if (items.length === 0) {
+        // Note already displayed above
       } else {
         // Format each item
         items.forEach(item => {

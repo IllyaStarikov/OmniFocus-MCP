@@ -87,7 +87,7 @@ server.tool(
 
 server.tool(
   "get_perspective_view",
-  "Get the items visible in a specific OmniFocus perspective. Shows what tasks and projects are displayed when viewing that perspective",
+  "Get items from a specific OmniFocus perspective by name. Supports built-in perspectives (Inbox, Projects, Tags, Flagged, Forecast, Review) with proper filtering. For custom perspectives, use query_omnifocus with specific filters instead.",
   getPerspectiveViewTool.schema.shape,
   getPerspectiveViewTool.handler
 );
