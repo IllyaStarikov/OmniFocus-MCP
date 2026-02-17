@@ -1,0 +1,64 @@
+import { describe, it, expect } from "vitest";
+import { parseISODate, isValidISODate, toISOString, parseDateOrNull } from "../../../src/utils/dates.js";
+
+describe("parseISODate", () => {
+  it("should parse valid ISO date strings", () => {
+    const date = parseISODate("2024-01-15T10:30:00.000Z");
+    expect(date).toBeInstanceOf(Date);
+    expect(date!.getUTCFullYear()).toBe(2024);
+    expect(date!.getUTCMonth()).toBe(0);
+    expect(date!.getUTCDate()).toBe(15);
+  });
+
+  it("should parse date-only strings", () => {
+    const date = parseISODate("2024-06-01");
+    expect(date).toBeInstanceOf(Date);
+  });
+
+  it("should return null for invalid date strings", () => {
+    expect(parseISODate("not a date")).toBeNull();
+    expect(parseISODate("")).toBeNull();
+    expect(parseISODate("2024-13-45")).toBeNull();
+  });
+
+  it("should handle timezone offsets", () => {
+    const date = parseISODate("2024-01-15T10:30:00+05:00");
+    expect(date).toBeInstanceOf(Date);
+  });
+});
+
+describe("isValidISODate", () => {
+  it("should return true for valid dates", () => {
+    expect(isValidISODate("2024-01-15T10:30:00.000Z")).toBe(true);
+    expect(isValidISODate("2024-06-01")).toBe(true);
+  });
+
+  it("should return false for invalid dates", () => {
+    expect(isValidISODate("not a date")).toBe(false);
+    expect(isValidISODate("")).toBe(false);
+  });
+});
+
+describe("toISOString", () => {
+  it("should convert Date to ISO string", () => {
+    const date = new Date("2024-01-15T10:30:00.000Z");
+    expect(toISOString(date)).toBe("2024-01-15T10:30:00.000Z");
+  });
+});
+
+describe("parseDateOrNull", () => {
+  it("should return ISO string for valid dates", () => {
+    const result = parseDateOrNull("2024-01-15T10:30:00.000Z");
+    expect(result).toBe("2024-01-15T10:30:00.000Z");
+  });
+
+  it("should return null for undefined/null/empty", () => {
+    expect(parseDateOrNull(undefined)).toBeNull();
+    expect(parseDateOrNull(null)).toBeNull();
+    expect(parseDateOrNull("")).toBeNull();
+  });
+
+  it("should return null for invalid dates", () => {
+    expect(parseDateOrNull("not valid")).toBeNull();
+  });
+});
