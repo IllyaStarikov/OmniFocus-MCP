@@ -40,4 +40,42 @@ export function registerDatabaseTools(server: McpServer, client: OmniFocusClient
       }
     },
   );
+
+  server.tool(
+    "dump_database",
+    "Dump the entire OmniFocus database including inbox, projects, folders, tags, and perspectives in a single call. Essential for getting full context.",
+    {
+      includeCompleted: z.boolean().optional().describe("Include completed/dropped items (default false)"),
+      maxDepth: z.number().min(0).optional().describe("Max depth for subtask hierarchy (0 = unlimited, default 0)"),
+      hideRecurringDuplicates: z.boolean().optional().describe("Hide future instances of recurring tasks (default false)"),
+    },
+    async (args) => {
+      try {
+        const dump = await client.dumpDatabase(args);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(dump, null, 2) }],
+        };
+      } catch (error) {
+        const { message } = formatMcpError(error);
+        return { content: [{ type: "text" as const, text: message }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "save_database",
+    "Explicitly save the OmniFocus database to disk",
+    {},
+    async () => {
+      try {
+        const result = await client.saveDatabase();
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        const { message } = formatMcpError(error);
+        return { content: [{ type: "text" as const, text: message }], isError: true };
+      }
+    },
+  );
 }

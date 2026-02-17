@@ -26,14 +26,19 @@ describe("MCP Protocol Integration", () => {
     await cleanup();
   });
 
-  it("should list all 32 tools", async () => {
+  it("should list all 50 tools", async () => {
     const result = await client.listTools();
     const toolNames = result.tools.map((t) => t.name).sort();
 
     expect(toolNames).toEqual([
       "add_task_notification",
+      "append_task_note",
+      "batch_complete_tasks",
+      "batch_create_tasks",
+      "batch_delete_tasks",
       "complete_project",
       "complete_task",
+      "convert_task_to_project",
       "create_folder",
       "create_project",
       "create_tag",
@@ -42,20 +47,33 @@ describe("MCP Protocol Integration", () => {
       "delete_project",
       "delete_tag",
       "delete_task",
+      "drop_project",
       "drop_task",
+      "dump_database",
       "duplicate_tasks",
       "get_database_summary",
+      "get_flagged_tasks",
+      "get_folder",
+      "get_inbox_tasks",
       "get_perspective_tasks",
       "get_project",
+      "get_project_tasks",
       "get_review_queue",
+      "get_tag",
       "get_task",
+      "get_task_count",
+      "get_today_completed_tasks",
       "list_folders",
       "list_perspectives",
       "list_projects",
       "list_tags",
+      "list_task_notifications",
       "list_tasks",
       "mark_reviewed",
+      "move_project",
       "move_tasks",
+      "remove_task_notification",
+      "save_database",
       "search",
       "set_task_tags",
       "uncomplete_task",
@@ -92,6 +110,8 @@ describe("MCP Protocol Integration", () => {
     // Database tools
     expect(toolNames).toContain("get_database_summary");
     expect(toolNames).toContain("search");
+    expect(toolNames).toContain("dump_database");
+    expect(toolNames).toContain("save_database");
 
     // Task tools
     expect(toolNames).toContain("list_tasks");
@@ -106,6 +126,17 @@ describe("MCP Protocol Integration", () => {
     expect(toolNames).toContain("duplicate_tasks");
     expect(toolNames).toContain("set_task_tags");
     expect(toolNames).toContain("add_task_notification");
+    expect(toolNames).toContain("get_inbox_tasks");
+    expect(toolNames).toContain("get_flagged_tasks");
+    expect(toolNames).toContain("get_today_completed_tasks");
+    expect(toolNames).toContain("append_task_note");
+    expect(toolNames).toContain("batch_create_tasks");
+    expect(toolNames).toContain("batch_delete_tasks");
+    expect(toolNames).toContain("batch_complete_tasks");
+    expect(toolNames).toContain("get_task_count");
+    expect(toolNames).toContain("list_task_notifications");
+    expect(toolNames).toContain("remove_task_notification");
+    expect(toolNames).toContain("convert_task_to_project");
 
     // Project tools
     expect(toolNames).toContain("list_projects");
@@ -113,18 +144,23 @@ describe("MCP Protocol Integration", () => {
     expect(toolNames).toContain("create_project");
     expect(toolNames).toContain("update_project");
     expect(toolNames).toContain("complete_project");
+    expect(toolNames).toContain("drop_project");
+    expect(toolNames).toContain("move_project");
     expect(toolNames).toContain("delete_project");
     expect(toolNames).toContain("get_review_queue");
     expect(toolNames).toContain("mark_reviewed");
+    expect(toolNames).toContain("get_project_tasks");
 
     // Folder tools
     expect(toolNames).toContain("list_folders");
+    expect(toolNames).toContain("get_folder");
     expect(toolNames).toContain("create_folder");
     expect(toolNames).toContain("update_folder");
     expect(toolNames).toContain("delete_folder");
 
     // Tag tools
     expect(toolNames).toContain("list_tags");
+    expect(toolNames).toContain("get_tag");
     expect(toolNames).toContain("create_tag");
     expect(toolNames).toContain("update_tag");
     expect(toolNames).toContain("delete_tag");

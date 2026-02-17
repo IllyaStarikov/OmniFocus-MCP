@@ -1,4 +1,4 @@
-import type { DatabaseSummaryJSON } from "../../src/types/omnifocus.js";
+import type { DatabaseSummaryJSON, DatabaseDumpJSON } from "../../src/types/omnifocus.js";
 
 export const mockDatabaseSummary: DatabaseSummaryJSON = {
   inboxCount: 5,
@@ -6,7 +6,7 @@ export const mockDatabaseSummary: DatabaseSummaryJSON = {
   tagCount: 8,
   folderCount: 3,
   availableTaskCount: 42,
-  dueSOonTaskCount: 3,
+  dueSoonTaskCount: 3,
   overdueTaskCount: 1,
   flaggedTaskCount: 7,
 };
@@ -16,3 +16,12 @@ export const mockSearchResults = [
   { type: "project", id: "proj-1", name: "Grocery shopping", note: "" },
   { type: "tag", id: "tag-1", name: "errands" },
 ];
+
+export const mockDatabaseDump: DatabaseDumpJSON = {
+  inbox: [],
+  projects: [],
+  folders: [],
+  tags: [],
+  perspectives: [],
+  summary: mockDatabaseSummary,
+};

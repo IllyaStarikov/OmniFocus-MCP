@@ -20,6 +20,23 @@ export function registerFolderTools(server: McpServer, client: OmniFocusClient):
   );
 
   server.tool(
+    "get_folder",
+    "Get detailed information about a folder including its child folders and projects",
+    {
+      id: z.string().describe("The folder ID"),
+    },
+    async ({ id }) => {
+      try {
+        const folder = await client.getFolder(id);
+        return { content: [{ type: "text" as const, text: JSON.stringify(folder, null, 2) }] };
+      } catch (error) {
+        const { message } = formatMcpError(error);
+        return { content: [{ type: "text" as const, text: message }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
     "create_folder",
     "Create a new folder in OmniFocus",
     {
@@ -44,6 +61,7 @@ export function registerFolderTools(server: McpServer, client: OmniFocusClient):
     {
       id: z.string().describe("The folder ID"),
       name: z.string().optional().describe("New folder name"),
+      status: z.enum(["active", "dropped"]).optional().describe("New folder status"),
     },
     async (args) => {
       try {

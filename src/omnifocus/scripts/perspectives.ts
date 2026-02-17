@@ -1,10 +1,20 @@
 import { serializePerspectiveFn, serializeTaskFn } from "../serializers.js";
+import type { ListPerspectivesArgs } from "../../types/omnifocus.js";
 
-export function buildListPerspectivesScript(): string {
+export function buildListPerspectivesScript(args: ListPerspectivesArgs = {}): string {
+  const argsJson = JSON.stringify(args);
   return `(() => {
+  var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializePerspectiveFn}
 
-  var perspectives = document.perspectives.slice();
+  var builtInNames = ["Inbox","Projects","Tags","Forecast","Flagged","Review","Nearby"];
+  var perspectives = Perspective.Custom.all.slice();
+  if (args.includeBuiltIn === false) {
+    perspectives = perspectives.filter(function(p) { return builtInNames.indexOf(p.name) === -1; });
+  }
+  if (args.includeCustom === false) {
+    perspectives = perspectives.filter(function(p) { return builtInNames.indexOf(p.name) !== -1; });
+  }
   return JSON.stringify(perspectives.map(serializePerspective));
 })()`;
 }
@@ -15,7 +25,7 @@ export function buildGetPerspectiveTasksScript(name: string): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeTaskFn}
 
-  var perspectives = document.perspectives.filter(function(p) { return p.name === args.name; });
+  var perspectives = Perspective.Custom.all.filter(function(p) { return p.name === args.name; });
   if (perspectives.length === 0) throw new Error("Perspective not found: " + args.name);
 
   var win = document.windows[0];

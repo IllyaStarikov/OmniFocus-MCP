@@ -20,6 +20,23 @@ export function registerTagTools(server: McpServer, client: OmniFocusClient): vo
   );
 
   server.tool(
+    "get_tag",
+    "Get detailed information about a tag including its child tags",
+    {
+      id: z.string().describe("The tag ID"),
+    },
+    async ({ id }) => {
+      try {
+        const tag = await client.getTag(id);
+        return { content: [{ type: "text" as const, text: JSON.stringify(tag, null, 2) }] };
+      } catch (error) {
+        const { message } = formatMcpError(error);
+        return { content: [{ type: "text" as const, text: message }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
     "create_tag",
     "Create a new tag in OmniFocus",
     {
@@ -27,6 +44,7 @@ export function registerTagTools(server: McpServer, client: OmniFocusClient): vo
       parentTagId: z.string().optional().describe("Parent tag ID for nested tags"),
       parentTagName: z.string().optional().describe("Parent tag name for nested tags"),
       allowsNextAction: z.boolean().optional().describe("Whether tasks with this tag can be next actions (default true)"),
+      status: z.enum(["active", "onHold", "dropped"]).optional().describe("Tag status"),
     },
     async (args) => {
       try {
@@ -46,6 +64,7 @@ export function registerTagTools(server: McpServer, client: OmniFocusClient): vo
       id: z.string().describe("The tag ID"),
       name: z.string().optional().describe("New tag name"),
       allowsNextAction: z.boolean().optional().describe("Whether tasks with this tag can be next actions"),
+      status: z.enum(["active", "onHold", "dropped"]).optional().describe("New tag status"),
     },
     async (args) => {
       try {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OmniFocusClient } from "../../../src/omnifocus/client.js";
-import type { FolderJSON } from "../../../src/types/omnifocus.js";
+import { mockFolder, mockNestedFolder } from "../../fixtures/folders.js";
 
 vi.mock("../../../src/omnifocus/executor.js", () => ({
   runOmniJS: vi.fn(),
@@ -9,22 +9,6 @@ vi.mock("../../../src/omnifocus/executor.js", () => ({
 
 import { runOmniJSJson } from "../../../src/omnifocus/executor.js";
 const mockRunOmniJSJson = vi.mocked(runOmniJSJson);
-
-const mockFolder: FolderJSON = {
-  id: "folder-1",
-  name: "Personal",
-  parentFolderId: null,
-  projectCount: 3,
-  folderCount: 1,
-};
-
-const mockNestedFolder: FolderJSON = {
-  id: "folder-2",
-  name: "Health",
-  parentFolderId: "folder-1",
-  projectCount: 2,
-  folderCount: 0,
-};
 
 describe("Folder client methods", () => {
   let client: OmniFocusClient;

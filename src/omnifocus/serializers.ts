@@ -5,10 +5,22 @@
 
 export const serializeTaskFn = `
 function serializeTask(task) {
+  var rr = null;
+  if (task.repetitionRule) {
+    var methodMap = {};
+    methodMap[Task.RepetitionMethod.Fixed] = "fixed";
+    methodMap[Task.RepetitionMethod.StartAfterCompletion] = "startAfterCompletion";
+    methodMap[Task.RepetitionMethod.DueAfterCompletion] = "dueAfterCompletion";
+    rr = {
+      ruleString: task.repetitionRule.ruleString,
+      method: methodMap[task.repetitionRule.method] || "fixed"
+    };
+  }
   return {
     id: task.id.primaryKey,
     name: task.name,
     note: task.note,
+    url: "omnifocus:///task/" + task.id.primaryKey,
     flagged: task.flagged,
     completed: task.taskStatus === Task.Status.Completed,
     dropped: task.taskStatus === Task.Status.Dropped,
@@ -16,6 +28,11 @@ function serializeTask(task) {
     dueDate: task.dueDate ? task.dueDate.toISOString() : null,
     completionDate: task.completionDate ? task.completionDate.toISOString() : null,
     droppedDate: task.droppedDate ? task.droppedDate.toISOString() : null,
+    added: task.added ? task.added.toISOString() : null,
+    modified: task.modified ? task.modified.toISOString() : null,
+    effectiveDueDate: task.effectiveDueDate ? task.effectiveDueDate.toISOString() : null,
+    effectiveDeferDate: task.effectiveDeferDate ? task.effectiveDeferDate.toISOString() : null,
+    effectiveFlagged: task.effectiveFlagged,
     estimatedMinutes: task.estimatedMinutes,
     containingProjectId: task.containingProject ? task.containingProject.id.primaryKey : null,
     containingProjectName: task.containingProject ? task.containingProject.name : null,
@@ -23,8 +40,23 @@ function serializeTask(task) {
     tags: task.tags.map(function(t) { return { id: t.id.primaryKey, name: t.name }; }),
     hasChildren: task.hasChildren,
     sequential: task.sequential,
-    inInbox: task.inInbox
+    completedByChildren: task.completedByChildren,
+    inInbox: task.inInbox,
+    repetitionRule: rr
   };
+}`;
+
+export const serializeTaskWithChildrenFn = `
+function serializeTaskWithChildren(task, depth, maxDepth) {
+  var result = serializeTask(task);
+  result.children = [];
+  if (task.hasChildren && (maxDepth === 0 || depth < maxDepth)) {
+    var kids = task.children;
+    for (var i = 0; i < kids.length; i++) {
+      result.children.push(serializeTaskWithChildren(kids[i], depth + 1, maxDepth));
+    }
+  }
+  return result;
 }`;
 
 export const serializeProjectFn = `
@@ -44,17 +76,23 @@ function serializeProject(project) {
     id: project.id.primaryKey,
     name: project.name,
     note: project.note,
+    url: "omnifocus:///task/" + project.id.primaryKey,
     status: statusMap[project.status] || "active",
     flagged: project.flagged,
     completed: project.status === Project.Status.Done,
     deferDate: project.deferDate ? project.deferDate.toISOString() : null,
     dueDate: project.dueDate ? project.dueDate.toISOString() : null,
     completionDate: project.completionDate ? project.completionDate.toISOString() : null,
+    droppedDate: project.droppedDate ? project.droppedDate.toISOString() : null,
+    added: project.task.added ? project.task.added.toISOString() : null,
+    modified: project.task.modified ? project.task.modified.toISOString() : null,
     estimatedMinutes: project.estimatedMinutes,
     containingFolderId: project.parentFolder ? project.parentFolder.id.primaryKey : null,
     containingFolderName: project.parentFolder ? project.parentFolder.name : null,
     tags: project.task.tags.map(function(t) { return { id: t.id.primaryKey, name: t.name }; }),
     sequential: project.sequential,
+    singleActionList: project.containsSingletonActions,
+    completedByChildren: project.completedByChildren,
     taskCount: project.flattenedTasks.length,
     remainingTaskCount: project.flattenedTasks.filter(function(t) { return t.taskStatus === Task.Status.Available || t.taskStatus === Task.Status.Blocked; }).length,
     lastReviewDate: project.lastReviewDate ? project.lastReviewDate.toISOString() : null,
@@ -65,25 +103,53 @@ function serializeProject(project) {
 
 export const serializeFolderFn = `
 function serializeFolder(folder) {
+  var statusVal = "active";
+  if (folder.status === Folder.Status.Dropped) statusVal = "dropped";
   return {
     id: folder.id.primaryKey,
     name: folder.name,
+    url: "omnifocus:///folder/" + folder.id.primaryKey,
+    status: statusVal,
     parentFolderId: folder.parent && folder.parent.constructor === Folder ? folder.parent.id.primaryKey : null,
+    childFolderIds: folder.folders.map(function(f) { return f.id.primaryKey; }),
+    projectIds: folder.projects.map(function(p) { return p.id.primaryKey; }),
     projectCount: folder.flattenedProjects.length,
     folderCount: folder.folders.length
   };
 }`;
 
+export const serializeFolderWithChildrenFn = `
+function serializeFolderWithChildren(folder) {
+  var result = serializeFolder(folder);
+  result.childFolders = folder.folders.map(function(f) { return serializeFolderWithChildren(f); });
+  result.projects = folder.projects.map(function(p) { return serializeProject(p); });
+  return result;
+}`;
+
 export const serializeTagFn = `
 function serializeTag(tag) {
+  var statusMap = {};
+  statusMap[Tag.Status.Active] = "active";
+  statusMap[Tag.Status.OnHold] = "onHold";
+  statusMap[Tag.Status.Dropped] = "dropped";
   return {
     id: tag.id.primaryKey,
     name: tag.name,
+    url: "omnifocus:///tag/" + tag.id.primaryKey,
+    status: statusMap[tag.status] || "active",
     parentTagId: tag.parent && tag.parent.constructor === Tag ? tag.parent.id.primaryKey : null,
+    childTagIds: tag.children.map(function(c) { return c.id.primaryKey; }),
     allowsNextAction: tag.allowsNextAction,
     availableTaskCount: tag.availableTasks.length,
     remainingTaskCount: tag.remainingTasks.length
   };
+}`;
+
+export const serializeTagWithChildrenFn = `
+function serializeTagWithChildren(tag) {
+  var result = serializeTag(tag);
+  result.childTags = tag.children.map(function(c) { return serializeTagWithChildren(c); });
+  return result;
 }`;
 
 export const serializePerspectiveFn = `
@@ -91,5 +157,21 @@ function serializePerspective(perspective) {
   return {
     id: perspective.id.primaryKey,
     name: perspective.name
+  };
+}`;
+
+export const serializeTaskNotificationFn = `
+function serializeTaskNotification(notif) {
+  var kindMap = {};
+  kindMap[Notification.Kind.DueDate] = "dueRelative";
+  kindMap[Notification.Kind.DeferDate] = "deferRelative";
+  kindMap[Notification.Kind.Absolute] = "absolute";
+  return {
+    id: notif.id.primaryKey,
+    kind: kindMap[notif.kind] || "absolute",
+    absoluteFireDate: notif.absoluteFireDate ? notif.absoluteFireDate.toISOString() : null,
+    relativeFireOffset: notif.relativeFireDate !== null ? notif.relativeFireDate : null,
+    nextFireDate: notif.nextFireDate ? notif.nextFireDate.toISOString() : null,
+    isSnoozed: notif.isSnoozed
   };
 }`;

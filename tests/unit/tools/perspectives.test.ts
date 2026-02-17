@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OmniFocusClient } from "../../../src/omnifocus/client.js";
-import type { PerspectiveJSON } from "../../../src/types/omnifocus.js";
+import { mockPerspective } from "../../fixtures/perspectives.js";
 import { mockTaskList } from "../../fixtures/tasks.js";
 
 vi.mock("../../../src/omnifocus/executor.js", () => ({
@@ -10,11 +10,6 @@ vi.mock("../../../src/omnifocus/executor.js", () => ({
 
 import { runOmniJSJson } from "../../../src/omnifocus/executor.js";
 const mockRunOmniJSJson = vi.mocked(runOmniJSJson);
-
-const mockPerspective: PerspectiveJSON = {
-  id: "persp-1",
-  name: "Due Soon",
-};
 
 describe("Perspective client methods", () => {
   let client: OmniFocusClient;

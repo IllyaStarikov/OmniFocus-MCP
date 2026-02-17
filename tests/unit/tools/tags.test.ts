@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OmniFocusClient } from "../../../src/omnifocus/client.js";
-import type { TagJSON } from "../../../src/types/omnifocus.js";
+import { mockTag, mockNestedTag, mockOnHoldTag } from "../../fixtures/tags.js";
 
 vi.mock("../../../src/omnifocus/executor.js", () => ({
   runOmniJS: vi.fn(),
@@ -9,33 +9,6 @@ vi.mock("../../../src/omnifocus/executor.js", () => ({
 
 import { runOmniJSJson } from "../../../src/omnifocus/executor.js";
 const mockRunOmniJSJson = vi.mocked(runOmniJSJson);
-
-const mockTag: TagJSON = {
-  id: "tag-1",
-  name: "errands",
-  parentTagId: null,
-  allowsNextAction: true,
-  availableTaskCount: 5,
-  remainingTaskCount: 7,
-};
-
-const mockNestedTag: TagJSON = {
-  id: "tag-2",
-  name: "grocery store",
-  parentTagId: "tag-1",
-  allowsNextAction: true,
-  availableTaskCount: 2,
-  remainingTaskCount: 3,
-};
-
-const mockOnHoldTag: TagJSON = {
-  id: "tag-3",
-  name: "waiting",
-  parentTagId: null,
-  allowsNextAction: false,
-  availableTaskCount: 0,
-  remainingTaskCount: 4,
-};
 
 describe("Tag client methods", () => {
   let client: OmniFocusClient;

@@ -1,5 +1,5 @@
-import { serializeProjectFn } from "../serializers.js";
-import type { ListProjectsArgs, CreateProjectArgs, UpdateProjectArgs } from "../../types/omnifocus.js";
+import { serializeProjectFn, serializeTaskFn } from "../serializers.js";
+import type { ListProjectsArgs, CreateProjectArgs, UpdateProjectArgs, GetProjectTasksArgs } from "../../types/omnifocus.js";
 
 export function buildListProjectsScript(args: ListProjectsArgs): string {
   const argsJson = JSON.stringify(args);
@@ -7,7 +7,7 @@ export function buildListProjectsScript(args: ListProjectsArgs): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeProjectFn}
 
-  var projects = document.flattenedProjects.slice();
+  var projects = flattenedProjects.slice();
 
   // Filter by status
   if (args.status === "active") {
@@ -36,7 +36,7 @@ export function buildListProjectsScript(args: ListProjectsArgs): string {
   if (args.search) {
     var query = args.search.toLowerCase();
     projects = projects.filter(function(p) {
-      return p.name.toLowerCase().indexOf(query) !== -1 || p.note.toLowerCase().indexOf(query) !== -1;
+      return p.name.toLowerCase().indexOf(query) !== -1 || (p.note || "").toLowerCase().indexOf(query) !== -1;
     });
   }
 
@@ -55,9 +55,9 @@ export function buildGetProjectScript(idOrName: string): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeProjectFn}
 
-  var project = document.flattenedProjects.byId(args.idOrName);
+  var project = flattenedProjects.byId(args.idOrName);
   if (!project) {
-    var matches = document.flattenedProjects.filter(function(p) { return p.name === args.idOrName; });
+    var matches = flattenedProjects.filter(function(p) { return p.name === args.idOrName; });
     if (matches.length > 0) project = matches[0];
   }
   if (!project) throw new Error("Project not found: " + args.idOrName);
@@ -73,19 +73,20 @@ export function buildCreateProjectScript(args: CreateProjectArgs): string {
 
   var folder = null;
   if (args.folderId) {
-    folder = document.flattenedFolders.byId(args.folderId);
+    folder = flattenedFolders.byId(args.folderId);
     if (!folder) throw new Error("Folder not found: " + args.folderId);
   } else if (args.folderName) {
-    var folders = document.flattenedFolders.filter(function(f) { return f.name === args.folderName; });
+    var folders = flattenedFolders.filter(function(f) { return f.name === args.folderName; });
     if (folders.length === 0) throw new Error("Folder not found: " + args.folderName);
     folder = folders[0];
   }
 
-  var project = new Project(args.name, folder ? folder.ending : document.portfolios[0].ending);
+  var project = new Project(args.name, folder ? folder.ending : library.ending);
 
   if (args.note !== undefined) project.note = args.note;
   if (args.sequential !== undefined) project.sequential = args.sequential;
   if (args.singleActionList === true) project.containsSingletonActions = true;
+  if (args.completedByChildren !== undefined) project.completedByChildren = args.completedByChildren;
   if (args.deferDate) project.deferDate = new Date(args.deferDate);
   if (args.dueDate) project.dueDate = new Date(args.dueDate);
   if (args.flagged !== undefined) project.flagged = args.flagged;
@@ -96,12 +97,12 @@ export function buildCreateProjectScript(args: CreateProjectArgs): string {
 
   if (args.tags && args.tags.length > 0) {
     args.tags.forEach(function(tagName) {
-      var matches = document.flattenedTags.filter(function(t) { return t.name === tagName; });
+      var matches = flattenedTags.filter(function(t) { return t.name === tagName; });
       if (matches.length > 0) {
         project.task.addTag(matches[0]);
       } else {
         var newTag = new Tag(tagName);
-        document.tags.push(newTag);
+        tags.push(newTag);
         project.task.addTag(newTag);
       }
     });
@@ -117,12 +118,14 @@ export function buildUpdateProjectScript(args: UpdateProjectArgs): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeProjectFn}
 
-  var project = document.flattenedProjects.byId(args.id);
+  var project = flattenedProjects.byId(args.id);
   if (!project) throw new Error("Project not found: " + args.id);
 
   if (args.name !== undefined) project.name = args.name;
   if (args.note !== undefined) project.note = args.note;
   if (args.sequential !== undefined) project.sequential = args.sequential;
+  if (args.singleActionList !== undefined) project.containsSingletonActions = args.singleActionList;
+  if (args.completedByChildren !== undefined) project.completedByChildren = args.completedByChildren;
   if (args.flagged !== undefined) project.flagged = args.flagged;
   if (args.deferDate !== undefined) project.deferDate = args.deferDate ? new Date(args.deferDate) : null;
   if (args.dueDate !== undefined) project.dueDate = args.dueDate ? new Date(args.dueDate) : null;
@@ -146,9 +149,39 @@ export function buildCompleteProjectScript(id: string): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeProjectFn}
 
-  var project = document.flattenedProjects.byId(args.id);
+  var project = flattenedProjects.byId(args.id);
   if (!project) throw new Error("Project not found: " + args.id);
   project.status = Project.Status.Done;
+  return JSON.stringify(serializeProject(project));
+})()`;
+}
+
+export function buildDropProjectScript(id: string): string {
+  const argsJson = JSON.stringify({ id });
+  return `(() => {
+  var args = JSON.parse(${JSON.stringify(argsJson)});
+  ${serializeProjectFn}
+
+  var project = flattenedProjects.byId(args.id);
+  if (!project) throw new Error("Project not found: " + args.id);
+  project.status = Project.Status.Dropped;
+  return JSON.stringify(serializeProject(project));
+})()`;
+}
+
+export function buildMoveProjectScript(projectId: string, folderId: string): string {
+  const argsJson = JSON.stringify({ projectId, folderId });
+  return `(() => {
+  var args = JSON.parse(${JSON.stringify(argsJson)});
+  ${serializeProjectFn}
+
+  var project = flattenedProjects.byId(args.projectId);
+  if (!project) throw new Error("Project not found: " + args.projectId);
+
+  var folder = flattenedFolders.byId(args.folderId);
+  if (!folder) throw new Error("Folder not found: " + args.folderId);
+
+  moveSections([project], folder.ending);
   return JSON.stringify(serializeProject(project));
 })()`;
 }
@@ -158,7 +191,7 @@ export function buildDeleteProjectScript(id: string): string {
   return `(() => {
   var args = JSON.parse(${JSON.stringify(argsJson)});
 
-  var project = document.flattenedProjects.byId(args.id);
+  var project = flattenedProjects.byId(args.id);
   if (!project) throw new Error("Project not found: " + args.id);
   deleteObject(project);
   return JSON.stringify({ deleted: true, id: args.id });
@@ -170,7 +203,7 @@ export function buildGetReviewQueueScript(): string {
   ${serializeProjectFn}
 
   var now = new Date();
-  var projects = document.flattenedProjects.filter(function(p) {
+  var projects = flattenedProjects.filter(function(p) {
     return p.status === Project.Status.Active && p.nextReviewDate && p.nextReviewDate <= now;
   });
 
@@ -184,9 +217,27 @@ export function buildMarkReviewedScript(id: string): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeProjectFn}
 
-  var project = document.flattenedProjects.byId(args.id);
+  var project = flattenedProjects.byId(args.id);
   if (!project) throw new Error("Project not found: " + args.id);
   project.markReviewed();
   return JSON.stringify(serializeProject(project));
+})()`;
+}
+
+export function buildGetProjectTasksScript(args: GetProjectTasksArgs): string {
+  const argsJson = JSON.stringify(args);
+  return `(() => {
+  var args = JSON.parse(${JSON.stringify(argsJson)});
+  ${serializeTaskFn}
+
+  var project = flattenedProjects.byId(args.projectId);
+  if (!project) throw new Error("Project not found: " + args.projectId);
+
+  var tasks = project.flattenedTasks.slice();
+  if (!args.includeCompleted) {
+    tasks = tasks.filter(function(t) { return t.taskStatus !== Task.Status.Completed && t.taskStatus !== Task.Status.Dropped; });
+  }
+
+  return JSON.stringify(tasks.map(serializeTask));
 })()`;
 }

@@ -53,6 +53,7 @@ export function registerProjectTools(server: McpServer, client: OmniFocusClient)
       folderName: z.string().optional().describe("Parent folder name"),
       sequential: z.boolean().optional().describe("Whether tasks must be completed in order"),
       singleActionList: z.boolean().optional().describe("Whether this is a single-action list"),
+      completedByChildren: z.boolean().optional().describe("Auto-complete when all children are completed"),
       deferDate: z.string().optional().describe("Defer date (ISO 8601)"),
       dueDate: z.string().optional().describe("Due date (ISO 8601)"),
       flagged: z.boolean().optional().describe("Whether to flag the project"),
@@ -85,6 +86,8 @@ export function registerProjectTools(server: McpServer, client: OmniFocusClient)
       note: z.string().optional().describe("New project note"),
       status: z.enum(["active", "onHold", "done", "dropped"]).optional().describe("New project status"),
       sequential: z.boolean().optional().describe("Whether tasks must be completed in order"),
+      singleActionList: z.boolean().optional().describe("Whether this is a single-action list"),
+      completedByChildren: z.boolean().optional().describe("Auto-complete when all children are completed"),
       deferDate: z.string().nullable().optional().describe("New defer date (ISO 8601) or null to clear"),
       dueDate: z.string().nullable().optional().describe("New due date (ISO 8601) or null to clear"),
       flagged: z.boolean().optional().describe("New flagged status"),
@@ -116,6 +119,41 @@ export function registerProjectTools(server: McpServer, client: OmniFocusClient)
     async ({ id }) => {
       try {
         const project = await client.completeProject(id);
+        return { content: [{ type: "text" as const, text: JSON.stringify(project, null, 2) }] };
+      } catch (error) {
+        const { message } = formatMcpError(error);
+        return { content: [{ type: "text" as const, text: message }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "drop_project",
+    "Mark a project as dropped (cancelled)",
+    {
+      id: z.string().describe("The project ID to drop"),
+    },
+    async ({ id }) => {
+      try {
+        const project = await client.dropProject(id);
+        return { content: [{ type: "text" as const, text: JSON.stringify(project, null, 2) }] };
+      } catch (error) {
+        const { message } = formatMcpError(error);
+        return { content: [{ type: "text" as const, text: message }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "move_project",
+    "Move a project to a different folder",
+    {
+      projectId: z.string().describe("The project ID to move"),
+      folderId: z.string().describe("The destination folder ID"),
+    },
+    async ({ projectId, folderId }) => {
+      try {
+        const project = await client.moveProject(projectId, folderId);
         return { content: [{ type: "text" as const, text: JSON.stringify(project, null, 2) }] };
       } catch (error) {
         const { message } = formatMcpError(error);
@@ -166,6 +204,24 @@ export function registerProjectTools(server: McpServer, client: OmniFocusClient)
       try {
         const project = await client.markReviewed(id);
         return { content: [{ type: "text" as const, text: JSON.stringify(project, null, 2) }] };
+      } catch (error) {
+        const { message } = formatMcpError(error);
+        return { content: [{ type: "text" as const, text: message }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "get_project_tasks",
+    "Get all tasks belonging to a specific project",
+    {
+      projectId: z.string().describe("The project ID"),
+      includeCompleted: z.boolean().optional().describe("Include completed/dropped tasks (default false)"),
+    },
+    async (args) => {
+      try {
+        const tasks = await client.getProjectTasks(args);
+        return { content: [{ type: "text" as const, text: JSON.stringify(tasks, null, 2) }] };
       } catch (error) {
         const { message } = formatMcpError(error);
         return { content: [{ type: "text" as const, text: message }], isError: true };
