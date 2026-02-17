@@ -1,0 +1,77 @@
+import type { TaskJSON } from "../../src/types/omnifocus.js";
+
+export const mockTask: TaskJSON = {
+  id: "task-abc-123",
+  name: "Buy groceries",
+  note: "Milk, eggs, bread",
+  flagged: false,
+  completed: false,
+  dropped: false,
+  deferDate: null,
+  dueDate: "2024-12-20T17:00:00.000Z",
+  completionDate: null,
+  droppedDate: null,
+  estimatedMinutes: 30,
+  containingProjectId: "proj-1",
+  containingProjectName: "Household",
+  parentTaskId: null,
+  tags: [{ id: "tag-1", name: "errands" }],
+  hasChildren: false,
+  sequential: false,
+  inInbox: false,
+};
+
+export const mockFlaggedTask: TaskJSON = {
+  id: "task-def-456",
+  name: "Review quarterly report 📊",
+  note: "Check the `revenue` section carefully\nAlso look at ${projections}",
+  flagged: true,
+  completed: false,
+  dropped: false,
+  deferDate: "2024-12-15T09:00:00.000Z",
+  dueDate: "2024-12-18T17:00:00.000Z",
+  completionDate: null,
+  droppedDate: null,
+  estimatedMinutes: 60,
+  containingProjectId: "proj-2",
+  containingProjectName: "Work",
+  parentTaskId: null,
+  tags: [
+    { id: "tag-2", name: "work" },
+    { id: "tag-3", name: "important" },
+  ],
+  hasChildren: false,
+  sequential: false,
+  inInbox: false,
+};
+
+export const mockInboxTask: TaskJSON = {
+  id: "task-ghi-789",
+  name: "Quick idea",
+  note: "",
+  flagged: false,
+  completed: false,
+  dropped: false,
+  deferDate: null,
+  dueDate: null,
+  completionDate: null,
+  droppedDate: null,
+  estimatedMinutes: null,
+  containingProjectId: null,
+  containingProjectName: null,
+  parentTaskId: null,
+  tags: [],
+  hasChildren: false,
+  sequential: false,
+  inInbox: true,
+};
+
+export const mockCompletedTask: TaskJSON = {
+  ...mockTask,
+  id: "task-completed-1",
+  name: "Already done",
+  completed: true,
+  completionDate: "2024-12-10T14:00:00.000Z",
+};
+
+export const mockTaskList: TaskJSON[] = [mockTask, mockFlaggedTask, mockInboxTask];
