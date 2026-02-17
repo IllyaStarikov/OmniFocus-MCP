@@ -1,5 +1,6 @@
 import { serializeProjectFn, serializeTaskFn } from "../serializers.js";
 import type { ListProjectsArgs, CreateProjectArgs, UpdateProjectArgs, GetProjectTasksArgs } from "../../types/omnifocus.js";
+import { validateDateArgs } from "../../utils/dates.js";
 
 export function buildListProjectsScript(args: ListProjectsArgs): string {
   const argsJson = JSON.stringify(args);
@@ -66,6 +67,7 @@ export function buildGetProjectScript(idOrName: string): string {
 }
 
 export function buildCreateProjectScript(args: CreateProjectArgs): string {
+  validateDateArgs(args as unknown as Record<string, unknown>, ["deferDate", "dueDate"]);
   const argsJson = JSON.stringify(args);
   return `(() => {
   var args = JSON.parse(${JSON.stringify(argsJson)});
@@ -113,6 +115,7 @@ export function buildCreateProjectScript(args: CreateProjectArgs): string {
 }
 
 export function buildUpdateProjectScript(args: UpdateProjectArgs): string {
+  validateDateArgs(args as unknown as Record<string, unknown>, ["deferDate", "dueDate"]);
   const argsJson = JSON.stringify(args);
   return `(() => {
   var args = JSON.parse(${JSON.stringify(argsJson)});

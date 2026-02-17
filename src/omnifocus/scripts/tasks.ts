@@ -1,5 +1,6 @@
 import { serializeTaskFn, serializeTaskWithChildrenFn, serializeTaskNotificationFn, serializeProjectFn } from "../serializers.js";
 import type { ListTasksArgs, CreateTaskArgs, UpdateTaskArgs, GetTaskArgs, MoveTasksArgs, DuplicateTasksArgs, SetTaskTagsArgs, AddTaskNotificationArgs, BatchCreateTasksArgs, BatchDeleteTasksArgs, BatchCompleteTasksArgs } from "../../types/omnifocus.js";
+import { validateDateArgs } from "../../utils/dates.js";
 
 // Shared filter logic used by both buildListTasksScript and buildGetTaskCountScript
 // Single-pass filter: all conditions checked in one pass to avoid intermediate array allocations
@@ -132,6 +133,7 @@ export function buildGetTaskScript(args: string | GetTaskArgs): string {
 }
 
 export function buildCreateTaskScript(args: CreateTaskArgs): string {
+  validateDateArgs(args as unknown as Record<string, unknown>, ["deferDate", "dueDate"]);
   const argsJson = JSON.stringify(args);
   return `(() => {
   var args = JSON.parse(${JSON.stringify(argsJson)});
@@ -179,6 +181,7 @@ export function buildCreateTaskScript(args: CreateTaskArgs): string {
 }
 
 export function buildUpdateTaskScript(args: UpdateTaskArgs): string {
+  validateDateArgs(args as unknown as Record<string, unknown>, ["deferDate", "dueDate"]);
   const argsJson = JSON.stringify(args);
   return `(() => {
   var args = JSON.parse(${JSON.stringify(argsJson)});
@@ -363,6 +366,7 @@ export function buildSetTaskTagsScript(args: SetTaskTagsArgs): string {
 }
 
 export function buildAddTaskNotificationScript(args: AddTaskNotificationArgs): string {
+  validateDateArgs(args as unknown as Record<string, unknown>, ["absoluteDate"]);
   const argsJson = JSON.stringify(args);
   return `(() => {
   var args = JSON.parse(${JSON.stringify(argsJson)});
@@ -378,10 +382,7 @@ export function buildAddTaskNotificationScript(args: AddTaskNotificationArgs): s
     if (args.relativeOffset === undefined) throw new Error("relativeOffset is required for dueRelative notifications");
     task.addNotification(args.relativeOffset);
   } else if (args.type === "deferRelative") {
-    if (args.relativeOffset === undefined) throw new Error("relativeOffset is required for deferRelative notifications");
-    var notif = task.addNotification(0);
-    notif.kind = Notification.Kind.DeferDate;
-    notif.relativeFireDate = args.relativeOffset;
+    throw new Error("deferRelative notifications are not supported by the OmniFocus Omni Automation API");
   }
 
   return JSON.stringify(serializeTask(task));
@@ -409,7 +410,7 @@ export function buildConvertTaskToProjectScript(taskId: string): string {
 
   var task = byId(flattenedTasks, args.taskId);
   if (!task) throw new Error("Task not found: " + args.taskId);
-  var projects = convertTasksToProjects([task]);
+  var projects = convertTasksToProjects([task], library.ending);
   if (projects.length === 0) throw new Error("Failed to convert task to project");
   return JSON.stringify(serializeProject(projects[0]));
 })()`;
@@ -464,6 +465,15 @@ export function buildRemoveTaskNotificationScript(taskId: string, notificationId
 }
 
 export function buildBatchCreateTasksScript(args: BatchCreateTasksArgs): string {
+  function validateBatchTaskDates(tasks: Record<string, unknown>[]): void {
+    for (const task of tasks) {
+      validateDateArgs(task, ["deferDate", "dueDate"]);
+      if (Array.isArray(task.children)) {
+        validateBatchTaskDates(task.children as Record<string, unknown>[]);
+      }
+    }
+  }
+  validateBatchTaskDates(args.tasks as unknown as Record<string, unknown>[]);
   const argsJson = JSON.stringify(args);
   return `(() => {
   var args = JSON.parse(${JSON.stringify(argsJson)});

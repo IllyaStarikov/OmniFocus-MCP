@@ -20,7 +20,7 @@ export function buildGetFolderScript(id: string): string {
 
   var folder = byId(flattenedFolders, args.id);
   if (!folder) throw new Error("Folder not found: " + args.id);
-  return JSON.stringify(serializeFolderWithChildren(folder));
+  return JSON.stringify(serializeFolderWithChildren(folder, 0, 0));
 })()`;
 }
 

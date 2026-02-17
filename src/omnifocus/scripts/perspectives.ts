@@ -31,9 +31,12 @@ export function buildGetPerspectiveTasksScript(name: string): string {
   var win = document.windows[0];
   if (!win) throw new Error("No OmniFocus window available");
 
+  // NOTE: This mutates the user's active OmniFocus window by changing its perspective.
+  // Save and restore the original perspective to minimize disruption.
+  var originalPerspective = win.perspective;
   win.perspective = perspectives[0];
 
-  // Wait briefly for perspective to load, then read content
+  // Read content after perspective switch
   var content = win.content;
   if (!content || !content.trees || content.trees.length === 0) {
     return JSON.stringify([]);
@@ -52,6 +55,9 @@ export function buildGetPerspectiveTasksScript(name: string): string {
     }
   }
   collectTasks(content.trees);
+
+  // Restore the original perspective
+  if (originalPerspective) win.perspective = originalPerspective;
 
   return JSON.stringify(tasks);
 })()`;

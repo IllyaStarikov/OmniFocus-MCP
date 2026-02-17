@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseISODate, isValidISODate, toISOString, parseDateOrNull } from "../../../src/utils/dates.js";
+import { parseISODate, isValidISODate, toISOString, parseDateOrNull, validateDateArgs } from "../../../src/utils/dates.js";
 
 describe("parseISODate", () => {
   it("should parse valid ISO date strings", () => {
@@ -60,5 +60,49 @@ describe("parseDateOrNull", () => {
 
   it("should return null for invalid dates", () => {
     expect(parseDateOrNull("not valid")).toBeNull();
+  });
+});
+
+describe("validateDateArgs", () => {
+  it("should pass for valid ISO dates", () => {
+    expect(() =>
+      validateDateArgs({ dueDate: "2024-01-15T10:30:00Z", deferDate: "2024-06-01" }, ["dueDate", "deferDate"]),
+    ).not.toThrow();
+  });
+
+  it("should throw for invalid date strings", () => {
+    expect(() =>
+      validateDateArgs({ dueDate: "not-a-date" }, ["dueDate"]),
+    ).toThrow("Invalid date for 'dueDate': not-a-date");
+  });
+
+  it("should skip undefined fields", () => {
+    expect(() =>
+      validateDateArgs({ dueDate: undefined }, ["dueDate"]),
+    ).not.toThrow();
+  });
+
+  it("should skip null fields", () => {
+    expect(() =>
+      validateDateArgs({ dueDate: null }, ["dueDate"]),
+    ).not.toThrow();
+  });
+
+  it("should skip missing fields", () => {
+    expect(() =>
+      validateDateArgs({}, ["dueDate", "deferDate"]),
+    ).not.toThrow();
+  });
+
+  it("should skip non-string fields", () => {
+    expect(() =>
+      validateDateArgs({ dueDate: 12345 }, ["dueDate"]),
+    ).not.toThrow();
+  });
+
+  it("should validate only specified fields", () => {
+    expect(() =>
+      validateDateArgs({ dueDate: "valid-date-no", otherField: "also-not-a-date" }, ["otherField"]),
+    ).toThrow("Invalid date for 'otherField'");
   });
 });

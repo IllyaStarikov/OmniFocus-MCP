@@ -19,7 +19,7 @@ export function buildGetTagScript(id: string): string {
 
   var tag = byId(flattenedTags, args.id);
   if (!tag) throw new Error("Tag not found: " + args.id);
-  return JSON.stringify(serializeTagWithChildren(tag));
+  return JSON.stringify(serializeTagWithChildren(tag, 0, 0));
 })()`;
 }
 

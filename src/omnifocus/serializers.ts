@@ -124,10 +124,13 @@ function serializeFolder(folder) {
 }`;
 
 export const serializeFolderWithChildrenFn = `
-function serializeFolderWithChildren(folder) {
+function serializeFolderWithChildren(folder, depth, maxDepth) {
   var result = serializeFolder(folder);
-  result.childFolders = folder.folders.map(function(f) { return serializeFolderWithChildren(f); });
+  result.childFolders = [];
   result.projects = folder.projects.map(function(p) { return serializeProject(p); });
+  if (maxDepth === 0 || depth < maxDepth) {
+    result.childFolders = folder.folders.map(function(f) { return serializeFolderWithChildren(f, depth + 1, maxDepth); });
+  }
   return result;
 }`;
 
@@ -152,9 +155,12 @@ function serializeTag(tag) {
 }`;
 
 export const serializeTagWithChildrenFn = `
-function serializeTagWithChildren(tag) {
+function serializeTagWithChildren(tag, depth, maxDepth) {
   var result = serializeTag(tag);
-  result.childTags = tag.children.map(function(c) { return serializeTagWithChildren(c); });
+  result.childTags = [];
+  if (maxDepth === 0 || depth < maxDepth) {
+    result.childTags = tag.children.map(function(c) { return serializeTagWithChildren(c, depth + 1, maxDepth); });
+  }
   return result;
 }`;
 
@@ -168,14 +174,13 @@ function serializePerspective(perspective) {
 
 export const serializeTaskNotificationFn = `
 var _notifKindMap = {};
-_notifKindMap[Notification.Kind.DueDate] = "dueRelative";
-_notifKindMap[Notification.Kind.DeferDate] = "deferRelative";
-_notifKindMap[Notification.Kind.Absolute] = "absolute";
+_notifKindMap[Task.Notification.Kind.DueRelative] = "dueRelative";
+_notifKindMap[Task.Notification.Kind.Absolute] = "absolute";
 
 function serializeTaskNotification(notif) {
   return {
     id: notif.id.primaryKey,
-    kind: _notifKindMap[notif.kind] || "absolute",
+    kind: _notifKindMap[notif.kind] || "unknown",
     absoluteFireDate: notif.absoluteFireDate ? notif.absoluteFireDate.toISOString() : null,
     relativeFireOffset: notif.relativeFireDate !== null ? notif.relativeFireDate : null,
     nextFireDate: notif.nextFireDate ? notif.nextFireDate.toISOString() : null,

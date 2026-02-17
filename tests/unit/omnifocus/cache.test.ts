@@ -74,4 +74,65 @@ describe("Cache", () => {
     cache.invalidatePrefix("a");
     expect(cache.size).toBe(1);
   });
+
+  it("should evict oldest entry when at maxSize", () => {
+    const smallCache = new Cache(3);
+    smallCache.set("a", 1, 5000);
+    smallCache.set("b", 2, 5000);
+    smallCache.set("c", 3, 5000);
+    expect(smallCache.size).toBe(3);
+
+    // Adding a 4th entry should evict "a" (FIFO)
+    smallCache.set("d", 4, 5000);
+    expect(smallCache.size).toBe(3);
+    expect(smallCache.get("a")).toBeUndefined();
+    expect(smallCache.get("b")).toBe(2);
+    expect(smallCache.get("d")).toBe(4);
+    smallCache.destroy();
+  });
+
+  it("should not evict when overwriting existing key at maxSize", () => {
+    const smallCache = new Cache(2);
+    smallCache.set("a", 1, 5000);
+    smallCache.set("b", 2, 5000);
+
+    // Overwriting "a" should not evict anything
+    smallCache.set("a", 10, 5000);
+    expect(smallCache.size).toBe(2);
+    expect(smallCache.get("a")).toBe(10);
+    expect(smallCache.get("b")).toBe(2);
+    smallCache.destroy();
+  });
+
+  it("should handle prefix invalidation with no matches", () => {
+    cache.set("tasks:list", [1], 5000);
+    cache.set("tasks:get", [2], 5000);
+
+    cache.invalidatePrefix("projects:");
+    expect(cache.size).toBe(2);
+    expect(cache.get("tasks:list")).toEqual([1]);
+  });
+
+  it("should be safe to call destroy() twice", () => {
+    cache.set("a", 1, 5000);
+    cache.destroy();
+    expect(() => cache.destroy()).not.toThrow();
+    expect(cache.size).toBe(0);
+  });
+
+  it("should sweep expired entries periodically", () => {
+    cache.set("short", "val", 1000);
+    cache.set("long", "val", 600_000);
+
+    // Advance past short TTL but before sweep interval
+    vi.advanceTimersByTime(2000);
+
+    // get() on expired key should clean it up
+    expect(cache.get("short")).toBeUndefined();
+    expect(cache.get("long")).toBe("val");
+
+    // Advance to trigger sweep interval (5 minutes)
+    vi.advanceTimersByTime(5 * 60 * 1000);
+    expect(cache.get("long")).toBe("val");
+  });
 });

@@ -61,7 +61,7 @@ export function registerProjectTools(server: McpServer, client: OmniFocusClient)
       reviewInterval: z
         .object({
           steps: z.number().describe("Number of units between reviews"),
-          unit: z.string().describe("Unit: 'day', 'week', 'month', 'year'"),
+          unit: z.enum(["day", "week", "month", "year"]).describe("Unit: 'day', 'week', 'month', 'year'"),
         })
         .optional()
         .describe("Review interval"),
@@ -94,7 +94,7 @@ export function registerProjectTools(server: McpServer, client: OmniFocusClient)
       reviewInterval: z
         .object({
           steps: z.number().describe("Number of units between reviews"),
-          unit: z.string().describe("Unit: 'day', 'week', 'month', 'year'"),
+          unit: z.enum(["day", "week", "month", "year"]).describe("Unit: 'day', 'week', 'month', 'year'"),
         })
         .optional()
         .describe("New review interval"),

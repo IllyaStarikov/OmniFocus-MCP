@@ -29,3 +29,17 @@ export function parseDateOrNull(value: string | undefined | null): string | null
   const date = parseISODate(value);
   return date ? toISOString(date) : null;
 }
+
+/**
+ * Validates all date-string fields in an args object.
+ * Throws if any specified field contains an invalid date string.
+ * Skips undefined/null values (those are valid — they mean "no date" or "clear date").
+ */
+export function validateDateArgs(args: Record<string, unknown>, fields: string[]): void {
+  for (const field of fields) {
+    const value = args[field];
+    if (typeof value === "string" && !isValidISODate(value)) {
+      throw new Error(`Invalid date for '${field}': ${value}`);
+    }
+  }
+}

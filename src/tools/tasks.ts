@@ -15,7 +15,7 @@ const batchTaskItemSchema: z.ZodType<any> = z.lazy(() =>
     flagged: z.boolean().optional().describe("Whether to flag"),
     deferDate: z.string().optional().describe("Defer date (ISO 8601)"),
     dueDate: z.string().optional().describe("Due date (ISO 8601)"),
-    estimatedMinutes: z.number().optional().describe("Estimated duration in minutes"),
+    estimatedMinutes: z.number().min(0).optional().describe("Estimated duration in minutes"),
     completedByChildren: z.boolean().optional().describe("Auto-complete when children complete"),
     tags: z.array(z.string()).optional().describe("Tag names"),
     repetitionRule: repetitionRuleSchema,
@@ -83,7 +83,7 @@ export function registerTaskTools(server: McpServer, client: OmniFocusClient): v
       flagged: z.boolean().optional().describe("Whether to flag the task"),
       deferDate: z.string().optional().describe("Defer date (ISO 8601)"),
       dueDate: z.string().optional().describe("Due date (ISO 8601)"),
-      estimatedMinutes: z.number().optional().describe("Estimated duration in minutes"),
+      estimatedMinutes: z.number().min(0).optional().describe("Estimated duration in minutes"),
       completedByChildren: z.boolean().optional().describe("Auto-complete when all children are completed"),
       projectId: z.string().optional().describe("Project ID to add task to"),
       projectName: z.string().optional().describe("Project name to add task to"),
@@ -111,7 +111,7 @@ export function registerTaskTools(server: McpServer, client: OmniFocusClient): v
       flagged: z.boolean().optional().describe("New flagged status"),
       deferDate: z.string().nullable().optional().describe("New defer date (ISO 8601) or null to clear"),
       dueDate: z.string().nullable().optional().describe("New due date (ISO 8601) or null to clear"),
-      estimatedMinutes: z.number().nullable().optional().describe("New estimated minutes or null to clear"),
+      estimatedMinutes: z.number().min(0).nullable().optional().describe("New estimated minutes or null to clear"),
       sequential: z.boolean().optional().describe("Whether subtasks must be completed in order"),
       completedByChildren: z.boolean().optional().describe("Auto-complete when all children are completed"),
       repetitionRule: z.object({
@@ -343,7 +343,7 @@ export function registerTaskTools(server: McpServer, client: OmniFocusClient): v
     "batch_create_tasks",
     "Create multiple tasks at once, with support for subtask hierarchies. Much more efficient than creating tasks one by one.",
     {
-      tasks: z.array(batchTaskItemSchema).describe("Array of tasks to create (can include nested children)"),
+      tasks: z.array(batchTaskItemSchema).min(1).describe("Array of tasks to create (can include nested children)"),
       projectId: z.string().optional().describe("Project ID to add tasks to"),
       projectName: z.string().optional().describe("Project name to add tasks to"),
       parentTaskId: z.string().optional().describe("Parent task ID for subtasks"),
@@ -415,7 +415,7 @@ export function registerTaskTools(server: McpServer, client: OmniFocusClient): v
     "batch_delete_tasks",
     "Delete multiple tasks at once. More efficient than deleting one by one.",
     {
-      taskIds: z.array(z.string()).describe("Array of task IDs to delete"),
+      taskIds: z.array(z.string()).min(1).describe("Array of task IDs to delete"),
     },
     async (args) => {
       try {
@@ -432,7 +432,7 @@ export function registerTaskTools(server: McpServer, client: OmniFocusClient): v
     "batch_complete_tasks",
     "Complete multiple tasks at once. More efficient than completing one by one.",
     {
-      taskIds: z.array(z.string()).describe("Array of task IDs to complete"),
+      taskIds: z.array(z.string()).min(1).describe("Array of task IDs to complete"),
     },
     async (args) => {
       try {

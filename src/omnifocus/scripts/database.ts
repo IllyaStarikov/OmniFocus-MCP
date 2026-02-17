@@ -116,11 +116,11 @@ export function buildDumpDatabaseScript(args: DumpDatabaseArgs = {}): string {
 
   // Folders (top-level with recursive children)
   var topFolders = Array.from(library).filter(function(x) { return x instanceof Folder; });
-  var foldersSerialized = topFolders.map(function(f) { return serializeFolderWithChildren(f); });
+  var foldersSerialized = topFolders.map(function(f) { return serializeFolderWithChildren(f, 0, maxDepth); });
 
   // Tags (top-level with recursive children)
   var topTags = tags.slice();
-  var tagsSerialized = topTags.map(function(t) { return serializeTagWithChildren(t); });
+  var tagsSerialized = topTags.map(function(t) { return serializeTagWithChildren(t, 0, maxDepth); });
 
   // Perspectives
   var perspectives = Perspective.Custom.all.slice();
