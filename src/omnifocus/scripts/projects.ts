@@ -55,7 +55,7 @@ export function buildGetProjectScript(idOrName: string): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeProjectFn}
 
-  var project = flattenedProjects.byId(args.idOrName);
+  var project = byId(flattenedProjects, args.idOrName);
   if (!project) {
     var matches = flattenedProjects.filter(function(p) { return p.name === args.idOrName; });
     if (matches.length > 0) project = matches[0];
@@ -73,7 +73,7 @@ export function buildCreateProjectScript(args: CreateProjectArgs): string {
 
   var folder = null;
   if (args.folderId) {
-    folder = flattenedFolders.byId(args.folderId);
+    folder = byId(flattenedFolders, args.folderId);
     if (!folder) throw new Error("Folder not found: " + args.folderId);
   } else if (args.folderName) {
     var folders = flattenedFolders.filter(function(f) { return f.name === args.folderName; });
@@ -118,7 +118,7 @@ export function buildUpdateProjectScript(args: UpdateProjectArgs): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeProjectFn}
 
-  var project = flattenedProjects.byId(args.id);
+  var project = byId(flattenedProjects, args.id);
   if (!project) throw new Error("Project not found: " + args.id);
 
   if (args.name !== undefined) project.name = args.name;
@@ -149,7 +149,7 @@ export function buildCompleteProjectScript(id: string): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeProjectFn}
 
-  var project = flattenedProjects.byId(args.id);
+  var project = byId(flattenedProjects, args.id);
   if (!project) throw new Error("Project not found: " + args.id);
   project.status = Project.Status.Done;
   return JSON.stringify(serializeProject(project));
@@ -162,7 +162,7 @@ export function buildDropProjectScript(id: string): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeProjectFn}
 
-  var project = flattenedProjects.byId(args.id);
+  var project = byId(flattenedProjects, args.id);
   if (!project) throw new Error("Project not found: " + args.id);
   project.status = Project.Status.Dropped;
   return JSON.stringify(serializeProject(project));
@@ -175,10 +175,10 @@ export function buildMoveProjectScript(projectId: string, folderId: string): str
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeProjectFn}
 
-  var project = flattenedProjects.byId(args.projectId);
+  var project = byId(flattenedProjects, args.projectId);
   if (!project) throw new Error("Project not found: " + args.projectId);
 
-  var folder = flattenedFolders.byId(args.folderId);
+  var folder = byId(flattenedFolders, args.folderId);
   if (!folder) throw new Error("Folder not found: " + args.folderId);
 
   moveSections([project], folder.ending);
@@ -191,7 +191,7 @@ export function buildDeleteProjectScript(id: string): string {
   return `(() => {
   var args = JSON.parse(${JSON.stringify(argsJson)});
 
-  var project = flattenedProjects.byId(args.id);
+  var project = byId(flattenedProjects, args.id);
   if (!project) throw new Error("Project not found: " + args.id);
   deleteObject(project);
   return JSON.stringify({ deleted: true, id: args.id });
@@ -217,7 +217,7 @@ export function buildMarkReviewedScript(id: string): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeProjectFn}
 
-  var project = flattenedProjects.byId(args.id);
+  var project = byId(flattenedProjects, args.id);
   if (!project) throw new Error("Project not found: " + args.id);
   project.markReviewed();
   return JSON.stringify(serializeProject(project));
@@ -230,7 +230,7 @@ export function buildGetProjectTasksScript(args: GetProjectTasksArgs): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeTaskFn}
 
-  var project = flattenedProjects.byId(args.projectId);
+  var project = byId(flattenedProjects, args.projectId);
   if (!project) throw new Error("Project not found: " + args.projectId);
 
   var tasks = project.flattenedTasks.slice();

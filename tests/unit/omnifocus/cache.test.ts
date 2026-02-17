@@ -5,11 +5,12 @@ describe("Cache", () => {
   let cache: Cache;
 
   beforeEach(() => {
-    cache = new Cache();
     vi.useFakeTimers();
+    cache = new Cache();
   });
 
   afterEach(() => {
+    cache.destroy();
     vi.useRealTimers();
   });
 

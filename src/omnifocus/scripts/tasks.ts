@@ -2,90 +2,78 @@ import { serializeTaskFn, serializeTaskWithChildrenFn, serializeTaskNotification
 import type { ListTasksArgs, CreateTaskArgs, UpdateTaskArgs, GetTaskArgs, MoveTasksArgs, DuplicateTasksArgs, SetTaskTagsArgs, AddTaskNotificationArgs, BatchCreateTasksArgs, BatchDeleteTasksArgs, BatchCompleteTasksArgs } from "../../types/omnifocus.js";
 
 // Shared filter logic used by both buildListTasksScript and buildGetTaskCountScript
+// Single-pass filter: all conditions checked in one pass to avoid intermediate array allocations
 const taskFilterLogicFn = `
-  var tasks;
+  var source;
   if (args.inInbox) {
-    tasks = inbox.slice();
+    source = inbox;
   } else {
-    tasks = flattenedTasks.slice();
+    source = flattenedTasks;
   }
 
-  // Filter by taskStatus
-  if (args.taskStatus === "available") {
-    tasks = tasks.filter(function(t) { return t.taskStatus === Task.Status.Available; });
-  } else if (args.taskStatus === "remaining") {
-    tasks = tasks.filter(function(t) { return t.taskStatus === Task.Status.Available || t.taskStatus === Task.Status.Blocked; });
-  } else if (args.taskStatus === "completed") {
-    tasks = tasks.filter(function(t) { return t.taskStatus === Task.Status.Completed; });
-  } else if (args.taskStatus === "dropped") {
-    tasks = tasks.filter(function(t) { return t.taskStatus === Task.Status.Dropped; });
-  } else if (args.completed === true) {
-    tasks = tasks.filter(function(t) { return t.taskStatus === Task.Status.Completed; });
-  } else if (args.completed === false) {
-    tasks = tasks.filter(function(t) { return t.taskStatus !== Task.Status.Completed && t.taskStatus !== Task.Status.Dropped; });
-  }
+  // Pre-compute date thresholds outside the loop
+  var _dueAfter = args.dueAfter ? new Date(args.dueAfter) : null;
+  var _dueBefore = args.dueBefore ? new Date(args.dueBefore) : null;
+  var _deferAfter = args.deferAfter ? new Date(args.deferAfter) : null;
+  var _deferBefore = args.deferBefore ? new Date(args.deferBefore) : null;
+  var _searchQuery = args.search ? args.search.toLowerCase() : null;
 
-  // Filter by flagged
-  if (args.flagged === true) {
-    tasks = tasks.filter(function(t) { return t.flagged; });
-  } else if (args.flagged === false) {
-    tasks = tasks.filter(function(t) { return !t.flagged; });
-  }
+  var tasks = source.filter(function(t) {
+    // Filter by taskStatus
+    if (args.taskStatus === "available") {
+      if (t.taskStatus !== Task.Status.Available) return false;
+    } else if (args.taskStatus === "remaining") {
+      if (t.taskStatus !== Task.Status.Available && t.taskStatus !== Task.Status.Blocked) return false;
+    } else if (args.taskStatus === "completed") {
+      if (t.taskStatus !== Task.Status.Completed) return false;
+    } else if (args.taskStatus === "dropped") {
+      if (t.taskStatus !== Task.Status.Dropped) return false;
+    } else if (args.completed === true) {
+      if (t.taskStatus !== Task.Status.Completed) return false;
+    } else if (args.completed === false) {
+      if (t.taskStatus === Task.Status.Completed || t.taskStatus === Task.Status.Dropped) return false;
+    }
 
-  // Filter by available
-  if (args.available === true) {
-    tasks = tasks.filter(function(t) { return t.taskStatus === Task.Status.Available; });
-  }
+    // Filter by flagged
+    if (args.flagged === true && !t.flagged) return false;
+    if (args.flagged === false && t.flagged) return false;
 
-  // Filter by project ID
-  if (args.projectId) {
-    tasks = tasks.filter(function(t) {
-      return t.containingProject && t.containingProject.id.primaryKey === args.projectId;
-    });
-  }
+    // Filter by available
+    if (args.available === true && t.taskStatus !== Task.Status.Available) return false;
 
-  // Filter by project name
-  if (args.projectName) {
-    tasks = tasks.filter(function(t) {
-      return t.containingProject && t.containingProject.name === args.projectName;
-    });
-  }
+    // Filter by project ID
+    if (args.projectId) {
+      if (!t.containingProject || t.containingProject.id.primaryKey !== args.projectId) return false;
+    }
 
-  // Filter by tag names
-  if (args.tagNames && args.tagNames.length > 0) {
-    tasks = tasks.filter(function(t) {
+    // Filter by project name
+    if (args.projectName) {
+      if (!t.containingProject || t.containingProject.name !== args.projectName) return false;
+    }
+
+    // Filter by tag names
+    if (args.tagNames && args.tagNames.length > 0) {
       var taskTagNames = t.tags.map(function(tg) { return tg.name; });
-      return args.tagNames.every(function(tn) { return taskTagNames.indexOf(tn) !== -1; });
-    });
-  }
+      for (var i = 0; i < args.tagNames.length; i++) {
+        if (taskTagNames.indexOf(args.tagNames[i]) === -1) return false;
+      }
+    }
 
-  // Filter by due date range
-  if (args.dueAfter) {
-    var dueAfter = new Date(args.dueAfter);
-    tasks = tasks.filter(function(t) { return t.dueDate && t.dueDate >= dueAfter; });
-  }
-  if (args.dueBefore) {
-    var dueBefore = new Date(args.dueBefore);
-    tasks = tasks.filter(function(t) { return t.dueDate && t.dueDate <= dueBefore; });
-  }
+    // Filter by due date range
+    if (_dueAfter && (!t.dueDate || t.dueDate < _dueAfter)) return false;
+    if (_dueBefore && (!t.dueDate || t.dueDate > _dueBefore)) return false;
 
-  // Filter by defer date range
-  if (args.deferAfter) {
-    var deferAfter = new Date(args.deferAfter);
-    tasks = tasks.filter(function(t) { return t.deferDate && t.deferDate >= deferAfter; });
-  }
-  if (args.deferBefore) {
-    var deferBefore = new Date(args.deferBefore);
-    tasks = tasks.filter(function(t) { return t.deferDate && t.deferDate <= deferBefore; });
-  }
+    // Filter by defer date range
+    if (_deferAfter && (!t.deferDate || t.deferDate < _deferAfter)) return false;
+    if (_deferBefore && (!t.deferDate || t.deferDate > _deferBefore)) return false;
 
-  // Filter by search query
-  if (args.search) {
-    var query = args.search.toLowerCase();
-    tasks = tasks.filter(function(t) {
-      return t.name.toLowerCase().indexOf(query) !== -1 || (t.note || "").toLowerCase().indexOf(query) !== -1;
-    });
-  }`;
+    // Filter by search query
+    if (_searchQuery) {
+      if (t.name.toLowerCase().indexOf(_searchQuery) === -1 && (t.note || "").toLowerCase().indexOf(_searchQuery) === -1) return false;
+    }
+
+    return true;
+  });`;
 
 export function buildListTasksScript(args: ListTasksArgs): string {
   const argsJson = JSON.stringify(args);
@@ -123,7 +111,7 @@ export function buildGetTaskScript(args: string | GetTaskArgs): string {
   ${serializeTaskFn}
   ${serializeTaskWithChildrenFn}
 
-  var task = flattenedTasks.byId(args.id);
+  var task = byId(flattenedTasks, args.id);
   if (!task) {
     throw new Error("Task not found: " + args.id);
   }
@@ -135,7 +123,7 @@ export function buildGetTaskScript(args: string | GetTaskArgs): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeTaskFn}
 
-  var task = flattenedTasks.byId(args.id);
+  var task = byId(flattenedTasks, args.id);
   if (!task) {
     throw new Error("Task not found: " + args.id);
   }
@@ -164,7 +152,7 @@ export function buildCreateTaskScript(args: CreateTaskArgs): string {
   }
 
   if (args.projectId) {
-    var project = flattenedProjects.byId(args.projectId);
+    var project = byId(flattenedProjects, args.projectId);
     if (!project) throw new Error("Project not found: " + args.projectId);
     moveTasks([task], project.ending);
   } else if (args.projectName) {
@@ -196,7 +184,7 @@ export function buildUpdateTaskScript(args: UpdateTaskArgs): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeTaskFn}
 
-  var task = flattenedTasks.byId(args.id);
+  var task = byId(flattenedTasks, args.id);
   if (!task) throw new Error("Task not found: " + args.id);
 
   if (args.name !== undefined) task.name = args.name;
@@ -227,7 +215,7 @@ export function buildCompleteTaskScript(id: string): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeTaskFn}
 
-  var task = flattenedTasks.byId(args.id);
+  var task = byId(flattenedTasks, args.id);
   if (!task) throw new Error("Task not found: " + args.id);
   task.markComplete();
   return JSON.stringify(serializeTask(task));
@@ -240,7 +228,7 @@ export function buildUncompleteTaskScript(id: string): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeTaskFn}
 
-  var task = flattenedTasks.byId(args.id);
+  var task = byId(flattenedTasks, args.id);
   if (!task) throw new Error("Task not found: " + args.id);
   task.markIncomplete();
   return JSON.stringify(serializeTask(task));
@@ -253,7 +241,7 @@ export function buildDropTaskScript(id: string): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeTaskFn}
 
-  var task = flattenedTasks.byId(args.id);
+  var task = byId(flattenedTasks, args.id);
   if (!task) throw new Error("Task not found: " + args.id);
   task.drop(false);
   return JSON.stringify(serializeTask(task));
@@ -265,7 +253,7 @@ export function buildDeleteTaskScript(id: string): string {
   return `(() => {
   var args = JSON.parse(${JSON.stringify(argsJson)});
 
-  var task = flattenedTasks.byId(args.id);
+  var task = byId(flattenedTasks, args.id);
   if (!task) throw new Error("Task not found: " + args.id);
   deleteObject(task);
   return JSON.stringify({ deleted: true, id: args.id });
@@ -279,18 +267,18 @@ export function buildMoveTasksScript(args: MoveTasksArgs): string {
   ${serializeTaskFn}
 
   var tasks = args.taskIds.map(function(id) {
-    var t = flattenedTasks.byId(id);
+    var t = byId(flattenedTasks, id);
     if (!t) throw new Error("Task not found: " + id);
     return t;
   });
 
   var destination;
   if (args.parentTaskId) {
-    var parentTask = flattenedTasks.byId(args.parentTaskId);
+    var parentTask = byId(flattenedTasks, args.parentTaskId);
     if (!parentTask) throw new Error("Parent task not found: " + args.parentTaskId);
     destination = parentTask.ending;
   } else if (args.projectId) {
-    var project = flattenedProjects.byId(args.projectId);
+    var project = byId(flattenedProjects, args.projectId);
     if (!project) throw new Error("Project not found: " + args.projectId);
     destination = project.ending;
   } else if (args.projectName) {
@@ -313,14 +301,14 @@ export function buildDuplicateTasksScript(args: DuplicateTasksArgs): string {
   ${serializeTaskFn}
 
   var tasks = args.taskIds.map(function(id) {
-    var t = flattenedTasks.byId(id);
+    var t = byId(flattenedTasks, id);
     if (!t) throw new Error("Task not found: " + id);
     return t;
   });
 
   var destination;
   if (args.projectId) {
-    var project = flattenedProjects.byId(args.projectId);
+    var project = byId(flattenedProjects, args.projectId);
     if (!project) throw new Error("Project not found: " + args.projectId);
     destination = project.ending;
   } else if (args.projectName) {
@@ -342,14 +330,16 @@ export function buildSetTaskTagsScript(args: SetTaskTagsArgs): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeTaskFn}
 
-  var task = flattenedTasks.byId(args.taskId);
+  var task = byId(flattenedTasks, args.taskId);
   if (!task) throw new Error("Task not found: " + args.taskId);
 
+  var tagMap = {};
+  flattenedTags.forEach(function(t) { tagMap[t.name] = t; });
+
   function findOrCreateTag(name) {
-    var matches = flattenedTags.filter(function(t) { return t.name === name; });
-    if (matches.length > 0) return matches[0];
+    if (tagMap[name]) return tagMap[name];
     var newTag = new Tag(name);
-    tags.push(newTag);
+    tagMap[name] = newTag;
     return newTag;
   }
 
@@ -364,8 +354,7 @@ export function buildSetTaskTagsScript(args: SetTaskTagsArgs): string {
     });
   } else if (args.mode === "remove") {
     args.tagNames.forEach(function(name) {
-      var matches = flattenedTags.filter(function(t) { return t.name === name; });
-      if (matches.length > 0) task.removeTag(matches[0]);
+      if (tagMap[name]) task.removeTag(tagMap[name]);
     });
   }
 
@@ -379,7 +368,7 @@ export function buildAddTaskNotificationScript(args: AddTaskNotificationArgs): s
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeTaskFn}
 
-  var task = flattenedTasks.byId(args.taskId);
+  var task = byId(flattenedTasks, args.taskId);
   if (!task) throw new Error("Task not found: " + args.taskId);
 
   if (args.type === "absolute") {
@@ -405,7 +394,7 @@ export function buildAppendTaskNoteScript(taskId: string, text: string): string 
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeTaskFn}
 
-  var task = flattenedTasks.byId(args.taskId);
+  var task = byId(flattenedTasks, args.taskId);
   if (!task) throw new Error("Task not found: " + args.taskId);
   task.appendStringToNote(args.text);
   return JSON.stringify(serializeTask(task));
@@ -418,7 +407,7 @@ export function buildConvertTaskToProjectScript(taskId: string): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeProjectFn}
 
-  var task = flattenedTasks.byId(args.taskId);
+  var task = byId(flattenedTasks, args.taskId);
   if (!task) throw new Error("Task not found: " + args.taskId);
   var projects = convertTasksToProjects([task]);
   if (projects.length === 0) throw new Error("Failed to convert task to project");
@@ -445,7 +434,7 @@ export function buildListTaskNotificationsScript(taskId: string): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeTaskNotificationFn}
 
-  var task = flattenedTasks.byId(args.taskId);
+  var task = byId(flattenedTasks, args.taskId);
   if (!task) throw new Error("Task not found: " + args.taskId);
 
   return JSON.stringify(task.notifications.map(serializeTaskNotification));
@@ -457,7 +446,7 @@ export function buildRemoveTaskNotificationScript(taskId: string, notificationId
   return `(() => {
   var args = JSON.parse(${JSON.stringify(argsJson)});
 
-  var task = flattenedTasks.byId(args.taskId);
+  var task = byId(flattenedTasks, args.taskId);
   if (!task) throw new Error("Task not found: " + args.taskId);
 
   var notif = null;
@@ -480,11 +469,13 @@ export function buildBatchCreateTasksScript(args: BatchCreateTasksArgs): string 
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeTaskFn}
 
+  var tagMap = {};
+  flattenedTags.forEach(function(t) { tagMap[t.name] = t; });
+
   function findOrCreateTag(name) {
-    var matches = flattenedTags.filter(function(t) { return t.name === name; });
-    if (matches.length > 0) return matches[0];
+    if (tagMap[name]) return tagMap[name];
     var newTag = new Tag(name);
-    tags.push(newTag);
+    tagMap[name] = newTag;
     return newTag;
   }
 
@@ -518,11 +509,11 @@ export function buildBatchCreateTasksScript(args: BatchCreateTasksArgs): string 
 
   var destination;
   if (args.parentTaskId) {
-    var parentTask = flattenedTasks.byId(args.parentTaskId);
+    var parentTask = byId(flattenedTasks, args.parentTaskId);
     if (!parentTask) throw new Error("Parent task not found: " + args.parentTaskId);
     destination = parentTask.ending;
   } else if (args.projectId) {
-    var project = flattenedProjects.byId(args.projectId);
+    var project = byId(flattenedProjects, args.projectId);
     if (!project) throw new Error("Project not found: " + args.projectId);
     destination = project.ending;
   } else if (args.projectName) {
@@ -545,12 +536,17 @@ export function buildBatchDeleteTasksScript(args: BatchDeleteTasksArgs): string 
   const argsJson = JSON.stringify(args);
   return `(() => {
   var args = JSON.parse(${JSON.stringify(argsJson)});
-  var results = [];
-  args.taskIds.forEach(function(id) {
-    var task = flattenedTasks.byId(id);
+  // Phase 1: validate all IDs before mutating
+  var tasksToDelete = args.taskIds.map(function(id) {
+    var task = byId(flattenedTasks, id);
     if (!task) throw new Error("Task not found: " + id);
+    return task;
+  });
+  // Phase 2: apply mutations
+  var results = [];
+  tasksToDelete.forEach(function(task, i) {
     deleteObject(task);
-    results.push({ deleted: true, id: id });
+    results.push({ deleted: true, id: args.taskIds[i] });
   });
   return JSON.stringify(results);
 })()`;
@@ -561,10 +557,15 @@ export function buildBatchCompleteTasksScript(args: BatchCompleteTasksArgs): str
   return `(() => {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeTaskFn}
-  var results = [];
-  args.taskIds.forEach(function(id) {
-    var task = flattenedTasks.byId(id);
+  // Phase 1: validate all IDs before mutating
+  var tasksToComplete = args.taskIds.map(function(id) {
+    var task = byId(flattenedTasks, id);
     if (!task) throw new Error("Task not found: " + id);
+    return task;
+  });
+  // Phase 2: apply mutations
+  var results = [];
+  tasksToComplete.forEach(function(task) {
     task.markComplete();
     results.push(serializeTask(task));
   });

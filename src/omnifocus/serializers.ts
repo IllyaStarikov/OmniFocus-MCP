@@ -1,21 +1,25 @@
 /**
  * Shared OmniJS serialization functions as string templates.
  * These are embedded directly in OmniJS scripts to convert OmniFocus objects to JSON.
+ *
+ * Maps are hoisted outside serializer functions to avoid re-allocation per call.
  */
 
 export const serializeTaskFn = `
+var _taskMethodMap = {};
+_taskMethodMap[Task.RepetitionMethod.Fixed] = "fixed";
+_taskMethodMap[Task.RepetitionMethod.StartAfterCompletion] = "startAfterCompletion";
+_taskMethodMap[Task.RepetitionMethod.DueAfterCompletion] = "dueAfterCompletion";
+
 function serializeTask(task) {
   var rr = null;
   if (task.repetitionRule) {
-    var methodMap = {};
-    methodMap[Task.RepetitionMethod.Fixed] = "fixed";
-    methodMap[Task.RepetitionMethod.StartAfterCompletion] = "startAfterCompletion";
-    methodMap[Task.RepetitionMethod.DueAfterCompletion] = "dueAfterCompletion";
     rr = {
       ruleString: task.repetitionRule.ruleString,
-      method: methodMap[task.repetitionRule.method] || "fixed"
+      method: _taskMethodMap[task.repetitionRule.method] || "fixed"
     };
   }
+  var cp = task.containingProject;
   return {
     id: task.id.primaryKey,
     name: task.name,
@@ -34,8 +38,8 @@ function serializeTask(task) {
     effectiveDeferDate: task.effectiveDeferDate ? task.effectiveDeferDate.toISOString() : null,
     effectiveFlagged: task.effectiveFlagged,
     estimatedMinutes: task.estimatedMinutes,
-    containingProjectId: task.containingProject ? task.containingProject.id.primaryKey : null,
-    containingProjectName: task.containingProject ? task.containingProject.name : null,
+    containingProjectId: cp ? cp.id.primaryKey : null,
+    containingProjectName: cp ? cp.name : null,
     parentTaskId: task.parent ? (task.parent.id ? task.parent.id.primaryKey : null) : null,
     tags: task.tags.map(function(t) { return { id: t.id.primaryKey, name: t.name }; }),
     hasChildren: task.hasChildren,
@@ -60,24 +64,25 @@ function serializeTaskWithChildren(task, depth, maxDepth) {
 }`;
 
 export const serializeProjectFn = `
-function serializeProject(project) {
-  var statusMap = {};
-  statusMap[Project.Status.Active] = "active";
-  statusMap[Project.Status.OnHold] = "onHold";
-  statusMap[Project.Status.Done] = "done";
-  statusMap[Project.Status.Dropped] = "dropped";
+var _projectStatusMap = {};
+_projectStatusMap[Project.Status.Active] = "active";
+_projectStatusMap[Project.Status.OnHold] = "onHold";
+_projectStatusMap[Project.Status.Done] = "done";
+_projectStatusMap[Project.Status.Dropped] = "dropped";
 
+function serializeProject(project) {
   var ri = null;
   if (project.reviewInterval) {
     ri = { steps: project.reviewInterval.steps, unit: project.reviewInterval.unit + "" };
   }
 
+  var ft = project.flattenedTasks;
   return {
     id: project.id.primaryKey,
     name: project.name,
     note: project.note,
     url: "omnifocus:///task/" + project.id.primaryKey,
-    status: statusMap[project.status] || "active",
+    status: _projectStatusMap[project.status] || "active",
     flagged: project.flagged,
     completed: project.status === Project.Status.Done,
     deferDate: project.deferDate ? project.deferDate.toISOString() : null,
@@ -93,8 +98,8 @@ function serializeProject(project) {
     sequential: project.sequential,
     singleActionList: project.containsSingletonActions,
     completedByChildren: project.completedByChildren,
-    taskCount: project.flattenedTasks.length,
-    remainingTaskCount: project.flattenedTasks.filter(function(t) { return t.taskStatus === Task.Status.Available || t.taskStatus === Task.Status.Blocked; }).length,
+    taskCount: ft.length,
+    remainingTaskCount: ft.filter(function(t) { return t.taskStatus === Task.Status.Available || t.taskStatus === Task.Status.Blocked; }).length,
     lastReviewDate: project.lastReviewDate ? project.lastReviewDate.toISOString() : null,
     nextReviewDate: project.nextReviewDate ? project.nextReviewDate.toISOString() : null,
     reviewInterval: ri
@@ -127,16 +132,17 @@ function serializeFolderWithChildren(folder) {
 }`;
 
 export const serializeTagFn = `
+var _tagStatusMap = {};
+_tagStatusMap[Tag.Status.Active] = "active";
+_tagStatusMap[Tag.Status.OnHold] = "onHold";
+_tagStatusMap[Tag.Status.Dropped] = "dropped";
+
 function serializeTag(tag) {
-  var statusMap = {};
-  statusMap[Tag.Status.Active] = "active";
-  statusMap[Tag.Status.OnHold] = "onHold";
-  statusMap[Tag.Status.Dropped] = "dropped";
   return {
     id: tag.id.primaryKey,
     name: tag.name,
     url: "omnifocus:///tag/" + tag.id.primaryKey,
-    status: statusMap[tag.status] || "active",
+    status: _tagStatusMap[tag.status] || "active",
     parentTagId: tag.parent && tag.parent.constructor === Tag ? tag.parent.id.primaryKey : null,
     childTagIds: tag.children.map(function(c) { return c.id.primaryKey; }),
     allowsNextAction: tag.allowsNextAction,
@@ -161,14 +167,15 @@ function serializePerspective(perspective) {
 }`;
 
 export const serializeTaskNotificationFn = `
+var _notifKindMap = {};
+_notifKindMap[Notification.Kind.DueDate] = "dueRelative";
+_notifKindMap[Notification.Kind.DeferDate] = "deferRelative";
+_notifKindMap[Notification.Kind.Absolute] = "absolute";
+
 function serializeTaskNotification(notif) {
-  var kindMap = {};
-  kindMap[Notification.Kind.DueDate] = "dueRelative";
-  kindMap[Notification.Kind.DeferDate] = "deferRelative";
-  kindMap[Notification.Kind.Absolute] = "absolute";
   return {
     id: notif.id.primaryKey,
-    kind: kindMap[notif.kind] || "absolute",
+    kind: _notifKindMap[notif.kind] || "absolute",
     absoluteFireDate: notif.absoluteFireDate ? notif.absoluteFireDate.toISOString() : null,
     relativeFireOffset: notif.relativeFireDate !== null ? notif.relativeFireDate : null,
     nextFireDate: notif.nextFireDate ? notif.nextFireDate.toISOString() : null,

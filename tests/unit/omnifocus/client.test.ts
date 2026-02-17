@@ -375,16 +375,17 @@ describe("OmniFocusClient", () => {
       expect(mockRunOmniJSJson).toHaveBeenCalledTimes(3);
     });
 
-    it("should invalidate database cache after setTaskTags", async () => {
+    it("should not invalidate database cache after setTaskTags", async () => {
+      // setTaskTags only changes tag assignments, not counts — database cache should survive
       mockRunOmniJSJson.mockResolvedValue(mockDatabaseSummary);
       await client.getDatabaseSummary();
 
       mockRunOmniJSJson.mockResolvedValue(mockTask);
       await client.setTaskTags({ taskId: "task-1", tagNames: ["new"], mode: "add" });
 
-      mockRunOmniJSJson.mockResolvedValue(mockDatabaseSummary);
+      // getDatabaseSummary should still be cached (2 calls total, not 3)
       await client.getDatabaseSummary();
-      expect(mockRunOmniJSJson).toHaveBeenCalledTimes(3);
+      expect(mockRunOmniJSJson).toHaveBeenCalledTimes(2);
     });
 
     it("should invalidate database cache after createFolder", async () => {

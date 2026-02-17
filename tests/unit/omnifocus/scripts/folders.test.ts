@@ -46,7 +46,7 @@ describe("folder script builders", () => {
     it("should handle parent folder by ID", () => {
       const script = buildCreateFolderScript({ name: "Sub", parentFolderId: "folder-1" });
       expect(script).toContain("folder-1");
-      expect(script).toContain("flattenedFolders.byId");
+      expect(script).toContain("byId(flattenedFolders");
     });
 
     it("should handle parent folder by name", () => {

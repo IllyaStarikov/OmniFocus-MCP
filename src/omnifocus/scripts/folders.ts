@@ -18,7 +18,7 @@ export function buildGetFolderScript(id: string): string {
   ${serializeProjectFn}
   ${serializeFolderWithChildrenFn}
 
-  var folder = flattenedFolders.byId(args.id);
+  var folder = byId(flattenedFolders, args.id);
   if (!folder) throw new Error("Folder not found: " + args.id);
   return JSON.stringify(serializeFolderWithChildren(folder));
 })()`;
@@ -32,7 +32,7 @@ export function buildCreateFolderScript(args: CreateFolderArgs): string {
 
   var parent = null;
   if (args.parentFolderId) {
-    parent = flattenedFolders.byId(args.parentFolderId);
+    parent = byId(flattenedFolders, args.parentFolderId);
     if (!parent) throw new Error("Parent folder not found: " + args.parentFolderId);
   } else if (args.parentFolderName) {
     var matches = flattenedFolders.filter(function(f) { return f.name === args.parentFolderName; });
@@ -51,7 +51,7 @@ export function buildUpdateFolderScript(args: UpdateFolderArgs): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeFolderFn}
 
-  var folder = flattenedFolders.byId(args.id);
+  var folder = byId(flattenedFolders, args.id);
   if (!folder) throw new Error("Folder not found: " + args.id);
 
   if (args.name !== undefined) folder.name = args.name;
@@ -70,7 +70,7 @@ export function buildDeleteFolderScript(id: string): string {
   return `(() => {
   var args = JSON.parse(${JSON.stringify(argsJson)});
 
-  var folder = flattenedFolders.byId(args.id);
+  var folder = byId(flattenedFolders, args.id);
   if (!folder) throw new Error("Folder not found: " + args.id);
   deleteObject(folder);
   return JSON.stringify({ deleted: true, id: args.id });

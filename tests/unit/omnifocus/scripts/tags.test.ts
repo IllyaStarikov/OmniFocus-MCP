@@ -41,7 +41,7 @@ describe("tag script builders", () => {
     it("should handle parent tag by ID", () => {
       const script = buildCreateTagScript({ name: "Sub", parentTagId: "tag-1" });
       expect(script).toContain("tag-1");
-      expect(script).toContain("flattenedTags.byId");
+      expect(script).toContain("byId(flattenedTags");
     });
 
     it("should handle parent tag by name", () => {

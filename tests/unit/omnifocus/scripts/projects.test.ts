@@ -71,7 +71,7 @@ describe("project script builders", () => {
     it("should handle folder assignment by ID", () => {
       const script = buildCreateProjectScript({ name: "Test", folderId: "folder-1" });
       expect(script).toContain("folder-1");
-      expect(script).toContain("flattenedFolders.byId");
+      expect(script).toContain("byId(flattenedFolders");
     });
 
     it("should handle folder assignment by name", () => {

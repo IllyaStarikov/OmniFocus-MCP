@@ -5,8 +5,17 @@ import { createServer } from "./server.js";
 import { logger } from "./utils/logger.js";
 
 async function main(): Promise<void> {
-  const { server } = createServer();
+  const { server, client } = createServer();
   const transport = new StdioServerTransport();
+
+  const shutdown = async () => {
+    logger.info("Shutting down OmniFocus MCP server");
+    client.destroy();
+    await server.close();
+    process.exit(0);
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 
   logger.info("Starting OmniFocus MCP server");
   await server.connect(transport);

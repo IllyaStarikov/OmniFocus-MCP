@@ -27,14 +27,14 @@ describe("task script builders", () => {
   describe("buildListTasksScript", () => {
     it("should generate valid script with no filters", () => {
       const script = buildListTasksScript({});
-      expect(script).toContain("flattenedTasks.slice()");
+      expect(script).toContain("flattenedTasks");
       expect(script).toContain("serializeTask");
       expect(script).toContain("JSON.stringify");
     });
 
     it("should include inbox filter when inInbox is true", () => {
       const script = buildListTasksScript({ inInbox: true });
-      expect(script).toContain("inbox.slice()");
+      expect(script).toContain("source = inbox");
     });
 
     it("should include flagged filter", () => {

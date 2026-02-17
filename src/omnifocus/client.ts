@@ -81,7 +81,6 @@ export class OmniFocusClient {
 
   private invalidateAfterMutation(...prefixes: string[]): void {
     for (const prefix of prefixes) this.cache.invalidatePrefix(prefix);
-    this.cache.invalidatePrefix("database:");
   }
 
   // ─── Database ──────────────────────────────────────────────────────
@@ -97,7 +96,13 @@ export class OmniFocusClient {
   }
 
   async search(query: string, limit = 50): Promise<Array<{ type: string; id: string; name: string; note?: string }>> {
-    return runOmniJSJson(buildSearchScript(query, limit));
+    const cacheKey = `database:search:${query}:${limit}`;
+    const cached = this.cache.get<Array<{ type: string; id: string; name: string; note?: string }>>(cacheKey);
+    if (cached) return cached;
+
+    const result = await runOmniJSJson<Array<{ type: string; id: string; name: string; note?: string }>>(buildSearchScript(query, limit));
+    this.cache.set(cacheKey, result, config.cacheTTL.database);
+    return result;
   }
 
   async dumpDatabase(args: DumpDatabaseArgs = {}): Promise<DatabaseDumpJSON> {
@@ -133,7 +138,7 @@ export class OmniFocusClient {
 
   async createTask(args: CreateTaskArgs): Promise<TaskJSON> {
     const result = await runOmniJSJson<TaskJSON>(buildCreateTaskScript(args));
-    this.invalidateAfterMutation("tasks:");
+    this.invalidateAfterMutation("tasks:", "database:");
     return result;
   }
 
@@ -145,25 +150,25 @@ export class OmniFocusClient {
 
   async completeTask(id: string): Promise<TaskJSON> {
     const result = await runOmniJSJson<TaskJSON>(buildCompleteTaskScript(id));
-    this.invalidateAfterMutation("tasks:", "projects:");
+    this.invalidateAfterMutation("tasks:", "projects:", "database:");
     return result;
   }
 
   async uncompleteTask(id: string): Promise<TaskJSON> {
     const result = await runOmniJSJson<TaskJSON>(buildUncompleteTaskScript(id));
-    this.invalidateAfterMutation("tasks:", "projects:");
+    this.invalidateAfterMutation("tasks:", "projects:", "database:");
     return result;
   }
 
   async dropTask(id: string): Promise<TaskJSON> {
     const result = await runOmniJSJson<TaskJSON>(buildDropTaskScript(id));
-    this.invalidateAfterMutation("tasks:", "projects:");
+    this.invalidateAfterMutation("tasks:", "projects:", "database:");
     return result;
   }
 
   async deleteTask(id: string): Promise<{ deleted: boolean; id: string }> {
     const result = await runOmniJSJson<{ deleted: boolean; id: string }>(buildDeleteTaskScript(id));
-    this.invalidateAfterMutation("tasks:", "projects:");
+    this.invalidateAfterMutation("tasks:", "projects:", "database:");
     return result;
   }
 
@@ -175,7 +180,7 @@ export class OmniFocusClient {
 
   async duplicateTasks(args: DuplicateTasksArgs): Promise<TaskJSON[]> {
     const result = await runOmniJSJson<TaskJSON[]>(buildDuplicateTasksScript(args));
-    this.invalidateAfterMutation("tasks:", "projects:");
+    this.invalidateAfterMutation("tasks:", "projects:", "database:");
     return result;
   }
 
@@ -199,16 +204,28 @@ export class OmniFocusClient {
 
   async convertTaskToProject(taskId: string): Promise<ProjectJSON> {
     const result = await runOmniJSJson<ProjectJSON>(buildConvertTaskToProjectScript(taskId));
-    this.invalidateAfterMutation("tasks:", "projects:");
+    this.invalidateAfterMutation("tasks:", "projects:", "database:");
     return result;
   }
 
   async getTodayCompletedTasks(): Promise<TaskJSON[]> {
-    return runOmniJSJson<TaskJSON[]>(buildGetTodayCompletedTasksScript());
+    const cacheKey = "tasks:todayCompleted";
+    const cached = this.cache.get<TaskJSON[]>(cacheKey);
+    if (cached) return cached;
+
+    const result = await runOmniJSJson<TaskJSON[]>(buildGetTodayCompletedTasksScript());
+    this.cache.set(cacheKey, result, config.cacheTTL.tasks);
+    return result;
   }
 
   async listTaskNotifications(taskId: string): Promise<TaskNotificationJSON[]> {
-    return runOmniJSJson<TaskNotificationJSON[]>(buildListTaskNotificationsScript(taskId));
+    const cacheKey = `tasks:notifications:${taskId}`;
+    const cached = this.cache.get<TaskNotificationJSON[]>(cacheKey);
+    if (cached) return cached;
+
+    const result = await runOmniJSJson<TaskNotificationJSON[]>(buildListTaskNotificationsScript(taskId));
+    this.cache.set(cacheKey, result, config.cacheTTL.tasks);
+    return result;
   }
 
   async removeTaskNotification(taskId: string, notificationId: string): Promise<{ removed: boolean; taskId: string; notificationId: string }> {
@@ -219,24 +236,30 @@ export class OmniFocusClient {
 
   async batchCreateTasks(args: BatchCreateTasksArgs): Promise<TaskJSON[]> {
     const result = await runOmniJSJson<TaskJSON[]>(buildBatchCreateTasksScript(args));
-    this.invalidateAfterMutation("tasks:", "projects:");
+    this.invalidateAfterMutation("tasks:", "projects:", "database:");
     return result;
   }
 
   async batchDeleteTasks(args: BatchDeleteTasksArgs): Promise<{ deleted: boolean; id: string }[]> {
     const result = await runOmniJSJson<{ deleted: boolean; id: string }[]>(buildBatchDeleteTasksScript(args));
-    this.invalidateAfterMutation("tasks:", "projects:");
+    this.invalidateAfterMutation("tasks:", "projects:", "database:");
     return result;
   }
 
   async batchCompleteTasks(args: BatchCompleteTasksArgs): Promise<TaskJSON[]> {
     const result = await runOmniJSJson<TaskJSON[]>(buildBatchCompleteTasksScript(args));
-    this.invalidateAfterMutation("tasks:", "projects:");
+    this.invalidateAfterMutation("tasks:", "projects:", "database:");
     return result;
   }
 
   async getTaskCount(args: ListTasksArgs = {}): Promise<{ count: number }> {
-    return runOmniJSJson<{ count: number }>(buildGetTaskCountScript(args));
+    const cacheKey = `tasks:count:${JSON.stringify(args)}`;
+    const cached = this.cache.get<{ count: number }>(cacheKey);
+    if (cached) return cached;
+
+    const result = await runOmniJSJson<{ count: number }>(buildGetTaskCountScript(args));
+    this.cache.set(cacheKey, result, config.cacheTTL.tasks);
+    return result;
   }
 
   // ─── Projects ─────────────────────────────────────────────────────
@@ -263,7 +286,7 @@ export class OmniFocusClient {
 
   async createProject(args: CreateProjectArgs): Promise<ProjectJSON> {
     const result = await runOmniJSJson<ProjectJSON>(buildCreateProjectScript(args));
-    this.invalidateAfterMutation("projects:", "folders:");
+    this.invalidateAfterMutation("projects:", "folders:", "database:");
     return result;
   }
 
@@ -275,13 +298,13 @@ export class OmniFocusClient {
 
   async completeProject(id: string): Promise<ProjectJSON> {
     const result = await runOmniJSJson<ProjectJSON>(buildCompleteProjectScript(id));
-    this.invalidateAfterMutation("projects:", "tasks:");
+    this.invalidateAfterMutation("projects:", "tasks:", "database:");
     return result;
   }
 
   async dropProject(id: string): Promise<ProjectJSON> {
     const result = await runOmniJSJson<ProjectJSON>(buildDropProjectScript(id));
-    this.invalidateAfterMutation("projects:", "tasks:");
+    this.invalidateAfterMutation("projects:", "tasks:", "database:");
     return result;
   }
 
@@ -293,12 +316,18 @@ export class OmniFocusClient {
 
   async deleteProject(id: string): Promise<{ deleted: boolean; id: string }> {
     const result = await runOmniJSJson<{ deleted: boolean; id: string }>(buildDeleteProjectScript(id));
-    this.invalidateAfterMutation("projects:", "tasks:", "folders:");
+    this.invalidateAfterMutation("projects:", "tasks:", "folders:", "database:");
     return result;
   }
 
   async getReviewQueue(): Promise<ProjectJSON[]> {
-    return runOmniJSJson<ProjectJSON[]>(buildGetReviewQueueScript());
+    const cacheKey = "projects:reviewQueue";
+    const cached = this.cache.get<ProjectJSON[]>(cacheKey);
+    if (cached) return cached;
+
+    const result = await runOmniJSJson<ProjectJSON[]>(buildGetReviewQueueScript());
+    this.cache.set(cacheKey, result, config.cacheTTL.projects);
+    return result;
   }
 
   async markReviewed(id: string): Promise<ProjectJSON> {
@@ -308,7 +337,13 @@ export class OmniFocusClient {
   }
 
   async getProjectTasks(args: GetProjectTasksArgs): Promise<TaskJSON[]> {
-    return runOmniJSJson<TaskJSON[]>(buildGetProjectTasksScript(args));
+    const cacheKey = `projects:tasks:${JSON.stringify(args)}`;
+    const cached = this.cache.get<TaskJSON[]>(cacheKey);
+    if (cached) return cached;
+
+    const result = await runOmniJSJson<TaskJSON[]>(buildGetProjectTasksScript(args));
+    this.cache.set(cacheKey, result, config.cacheTTL.tasks);
+    return result;
   }
 
   // ─── Folders ──────────────────────────────────────────────────────
@@ -324,12 +359,18 @@ export class OmniFocusClient {
   }
 
   async getFolder(id: string): Promise<FolderWithChildrenJSON> {
-    return runOmniJSJson<FolderWithChildrenJSON>(buildGetFolderScript(id));
+    const cacheKey = `folders:get:${id}`;
+    const cached = this.cache.get<FolderWithChildrenJSON>(cacheKey);
+    if (cached) return cached;
+
+    const result = await runOmniJSJson<FolderWithChildrenJSON>(buildGetFolderScript(id));
+    this.cache.set(cacheKey, result, config.cacheTTL.folders);
+    return result;
   }
 
   async createFolder(args: CreateFolderArgs): Promise<FolderJSON> {
     const result = await runOmniJSJson<FolderJSON>(buildCreateFolderScript(args));
-    this.invalidateAfterMutation("folders:");
+    this.invalidateAfterMutation("folders:", "database:");
     return result;
   }
 
@@ -341,7 +382,7 @@ export class OmniFocusClient {
 
   async deleteFolder(id: string): Promise<{ deleted: boolean; id: string }> {
     const result = await runOmniJSJson<{ deleted: boolean; id: string }>(buildDeleteFolderScript(id));
-    this.invalidateAfterMutation("folders:", "projects:");
+    this.invalidateAfterMutation("folders:", "projects:", "database:");
     return result;
   }
 
@@ -358,12 +399,18 @@ export class OmniFocusClient {
   }
 
   async getTag(id: string): Promise<TagWithChildrenJSON> {
-    return runOmniJSJson<TagWithChildrenJSON>(buildGetTagScript(id));
+    const cacheKey = `tags:get:${id}`;
+    const cached = this.cache.get<TagWithChildrenJSON>(cacheKey);
+    if (cached) return cached;
+
+    const result = await runOmniJSJson<TagWithChildrenJSON>(buildGetTagScript(id));
+    this.cache.set(cacheKey, result, config.cacheTTL.tags);
+    return result;
   }
 
   async createTag(args: CreateTagArgs): Promise<TagJSON> {
     const result = await runOmniJSJson<TagJSON>(buildCreateTagScript(args));
-    this.invalidateAfterMutation("tags:");
+    this.invalidateAfterMutation("tags:", "database:");
     return result;
   }
 
@@ -375,7 +422,7 @@ export class OmniFocusClient {
 
   async deleteTag(id: string): Promise<{ deleted: boolean; id: string }> {
     const result = await runOmniJSJson<{ deleted: boolean; id: string }>(buildDeleteTagScript(id));
-    this.invalidateAfterMutation("tags:", "tasks:");
+    this.invalidateAfterMutation("tags:", "tasks:", "database:");
     return result;
   }
 
@@ -392,7 +439,13 @@ export class OmniFocusClient {
   }
 
   async getPerspectiveTasks(name: string): Promise<TaskJSON[]> {
-    return runOmniJSJson<TaskJSON[]>(buildGetPerspectiveTasksScript(name));
+    const cacheKey = `perspectives:tasks:${name}`;
+    const cached = this.cache.get<TaskJSON[]>(cacheKey);
+    if (cached) return cached;
+
+    const result = await runOmniJSJson<TaskJSON[]>(buildGetPerspectiveTasksScript(name));
+    this.cache.set(cacheKey, result, config.cacheTTL.tasks);
+    return result;
   }
 
   // ─── Cache management ─────────────────────────────────────────────
@@ -403,5 +456,9 @@ export class OmniFocusClient {
     } else {
       this.cache.invalidateAll();
     }
+  }
+
+  destroy(): void {
+    this.cache.destroy();
   }
 }

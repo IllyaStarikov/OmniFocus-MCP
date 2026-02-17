@@ -7,8 +7,8 @@ export const config = {
 
   /** Cache TTLs in milliseconds by domain */
   cacheTTL: {
-    tasks: 10_000,
-    projects: 30_000,
+    tasks: 60_000,
+    projects: 60_000,
     folders: 60_000,
     tags: 60_000,
     database: 60_000,

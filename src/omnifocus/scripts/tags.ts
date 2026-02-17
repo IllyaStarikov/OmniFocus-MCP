@@ -17,7 +17,7 @@ export function buildGetTagScript(id: string): string {
   ${serializeTagFn}
   ${serializeTagWithChildrenFn}
 
-  var tag = flattenedTags.byId(args.id);
+  var tag = byId(flattenedTags, args.id);
   if (!tag) throw new Error("Tag not found: " + args.id);
   return JSON.stringify(serializeTagWithChildren(tag));
 })()`;
@@ -31,7 +31,7 @@ export function buildCreateTagScript(args: CreateTagArgs): string {
 
   var parent = null;
   if (args.parentTagId) {
-    parent = flattenedTags.byId(args.parentTagId);
+    parent = byId(flattenedTags, args.parentTagId);
     if (!parent) throw new Error("Parent tag not found: " + args.parentTagId);
   } else if (args.parentTagName) {
     var matches = flattenedTags.filter(function(t) { return t.name === args.parentTagName; });
@@ -67,7 +67,7 @@ export function buildUpdateTagScript(args: UpdateTagArgs): string {
   var args = JSON.parse(${JSON.stringify(argsJson)});
   ${serializeTagFn}
 
-  var tag = flattenedTags.byId(args.id);
+  var tag = byId(flattenedTags, args.id);
   if (!tag) throw new Error("Tag not found: " + args.id);
 
   if (args.name !== undefined) tag.name = args.name;
@@ -88,7 +88,7 @@ export function buildDeleteTagScript(id: string): string {
   return `(() => {
   var args = JSON.parse(${JSON.stringify(argsJson)});
 
-  var tag = flattenedTags.byId(args.id);
+  var tag = byId(flattenedTags, args.id);
   if (!tag) throw new Error("Tag not found: " + args.id);
   deleteObject(tag);
   return JSON.stringify({ deleted: true, id: args.id });

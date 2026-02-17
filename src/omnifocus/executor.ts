@@ -6,33 +6,51 @@ import { logger } from "../utils/logger.js";
 
 const execFileAsync = promisify(execFile);
 
+/** OmniJS helper functions prepended to every script */
+const OMNIJS_PRELUDE = `function byId(collection, id) {
+  for (var i = 0; i < collection.length; i++) {
+    if (collection[i].id && collection[i].id.primaryKey === id) return collection[i];
+  }
+  return null;
+}`;
+
+/** Promise-based mutex: serializes osascript calls to avoid Apple Events races */
+let pending: Promise<unknown> = Promise.resolve();
+
 /**
  * Executes an OmniJS script inside OmniFocus via osascript JXA bridge.
  * Returns the raw stdout string.
+ * Calls are serialized via a mutex to prevent concurrent Apple Events races.
  */
 export async function runOmniJS(omniScript: string): Promise<string> {
-  const jxaScript = `(() => {
+  const execute = async (): Promise<string> => {
+    const fullScript = OMNIJS_PRELUDE + '\n' + omniScript;
+    const jxaScript = `(() => {
   const app = Application("OmniFocus");
-  return app.evaluateJavascript(${JSON.stringify(omniScript)});
+  return app.evaluateJavascript(${JSON.stringify(fullScript)});
 })()`;
 
-  logger.debug("Executing OmniJS script", { scriptLength: omniScript.length });
+    logger.debug("Executing OmniJS script", { scriptLength: omniScript.length });
 
-  try {
-    const { stdout } = await execFileAsync("osascript", ["-l", "JavaScript", "-e", jxaScript], {
-      timeout: config.executorTimeout,
-      maxBuffer: config.maxBuffer,
-    });
+    try {
+      const { stdout } = await execFileAsync("osascript", ["-l", "JavaScript", "-e", jxaScript], {
+        timeout: config.executorTimeout,
+        maxBuffer: config.maxBuffer,
+      });
 
-    return stdout.trim();
-  } catch (error: unknown) {
-    const execError = error as { stderr?: string; code?: number | null; killed?: boolean };
-    const stderr = execError.stderr || "";
-    const exitCode = execError.killed ? null : (execError.code ?? 1);
+      return stdout.trim();
+    } catch (error: unknown) {
+      const execError = error as { stderr?: string; code?: number | null; killed?: boolean };
+      const stderr = execError.stderr || "";
+      const exitCode = execError.killed ? null : (execError.code ?? 1);
 
-    logger.error("OmniJS execution failed", { stderr, exitCode });
-    throw parseExecutorError(stderr, exitCode);
-  }
+      logger.error("OmniJS execution failed", { stderr, exitCode });
+      throw parseExecutorError(stderr, exitCode);
+    }
+  };
+
+  pending = pending.then(execute, execute);
+  return pending as Promise<string>;
 }
 
 /**
