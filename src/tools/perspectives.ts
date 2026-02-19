@@ -6,9 +6,9 @@ import { formatMcpError } from "../utils/errors.js";
 export function registerPerspectiveTools(server: McpServer, client: OmniFocusClient): void {
   server.tool(
     "list_perspectives",
-    "List perspectives in OmniFocus. By default lists custom perspectives; use filters to include/exclude built-in ones.",
+    "List perspectives in OmniFocus. Only custom perspectives are available; built-in perspectives (Inbox, Projects, Tags, Forecast, Flagged, Review, Nearby) cannot be accessed via the API. Use dedicated tools instead (e.g. get_inbox_tasks, get_flagged_tasks, get_review_queue, list_projects, list_tags, or list_tasks with date filters for Forecast).",
     {
-      includeBuiltIn: z.boolean().optional().describe("Include built-in perspectives (default true)"),
+      includeBuiltIn: z.boolean().optional().describe("Include custom perspectives whose names match built-in perspective names (default true). Note: actual built-in perspectives are not available via the API."),
       includeCustom: z.boolean().optional().describe("Include custom perspectives (default true)"),
     },
     async (args) => {
@@ -24,7 +24,7 @@ export function registerPerspectiveTools(server: McpServer, client: OmniFocusCli
 
   server.tool(
     "get_perspective_tasks",
-    "Get tasks shown in a specific perspective",
+    "Get tasks shown in a specific custom perspective. Built-in perspectives (Inbox, Forecast, etc.) are not supported — use dedicated tools instead.",
     {
       name: z.string().describe("The perspective name"),
     },

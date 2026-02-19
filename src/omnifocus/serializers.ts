@@ -178,11 +178,19 @@ _notifKindMap[Task.Notification.Kind.DueRelative] = "dueRelative";
 _notifKindMap[Task.Notification.Kind.Absolute] = "absolute";
 
 function serializeTaskNotification(notif) {
+  var kind = _notifKindMap[notif.kind] || "unknown";
+  var absDate = null;
+  var relOffset = null;
+  if (kind === "absolute") {
+    try { absDate = notif.absoluteFireDate ? notif.absoluteFireDate.toISOString() : null; } catch(e) {}
+  } else if (kind === "dueRelative") {
+    try { relOffset = notif.relativeFireDate !== null ? notif.relativeFireDate : null; } catch(e) {}
+  }
   return {
     id: notif.id.primaryKey,
-    kind: _notifKindMap[notif.kind] || "unknown",
-    absoluteFireDate: notif.absoluteFireDate ? notif.absoluteFireDate.toISOString() : null,
-    relativeFireOffset: notif.relativeFireDate !== null ? notif.relativeFireDate : null,
+    kind: kind,
+    absoluteFireDate: absDate,
+    relativeFireOffset: relOffset,
     nextFireDate: notif.nextFireDate ? notif.nextFireDate.toISOString() : null,
     isSnoozed: notif.isSnoozed
   };

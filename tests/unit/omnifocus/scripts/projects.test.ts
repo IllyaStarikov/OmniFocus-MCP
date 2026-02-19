@@ -177,10 +177,10 @@ describe("project script builders", () => {
   });
 
   describe("buildMarkReviewedScript", () => {
-    it("should call markReviewed on the project", () => {
+    it("should set lastReviewDate on the project", () => {
       const script = buildMarkReviewedScript("proj-123");
       expect(script).toContain("proj-123");
-      expect(script).toContain("markReviewed");
+      expect(script).toContain("lastReviewDate");
     });
   });
 

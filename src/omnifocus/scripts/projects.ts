@@ -222,7 +222,7 @@ export function buildMarkReviewedScript(id: string): string {
 
   var project = byId(flattenedProjects, args.id);
   if (!project) throw new Error("Project not found: " + args.id);
-  project.markReviewed();
+  project.lastReviewDate = new Date();
   return JSON.stringify(serializeProject(project));
 })()`;
 }

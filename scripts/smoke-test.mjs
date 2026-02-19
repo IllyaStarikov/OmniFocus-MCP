@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Smoke test for all OmniFocus MCP mutation tools.
+ * Smoke test for all OmniFocus MCP tools (read-only + mutation).
  * Creates items with __MCPTEST__ prefix, verifies, then cleans up.
  */
 
@@ -39,11 +39,12 @@ async function runOmniJSJson(omniScript) {
 
 // ─── Import script builders ─────────────────────────────────────────────
 
-const tags = await import("./dist/omnifocus/scripts/tags.js");
-const folders = await import("./dist/omnifocus/scripts/folders.js");
-const projects = await import("./dist/omnifocus/scripts/projects.js");
-const tasks = await import("./dist/omnifocus/scripts/tasks.js");
-const database = await import("./dist/omnifocus/scripts/database.js");
+const tags = await import("../dist/omnifocus/scripts/tags.js");
+const folders = await import("../dist/omnifocus/scripts/folders.js");
+const projects = await import("../dist/omnifocus/scripts/projects.js");
+const tasks = await import("../dist/omnifocus/scripts/tasks.js");
+const database = await import("../dist/omnifocus/scripts/database.js");
+const perspectives = await import("../dist/omnifocus/scripts/perspectives.js");
 
 // ─── Test framework ─────────────────────────────────────────────────────
 
@@ -150,6 +151,100 @@ await test("create_project: SAL in SubFolder, singleActionList", async () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  PHASE 1.5: Read-Only Tools
+// ═══════════════════════════════════════════════════════════════════════════
+
+console.log("\n📖 Phase 1.5: Read-Only Tools");
+
+await test("list_tags: returns array including __MCPTEST__ tags", async () => {
+  const result = await runOmniJSJson(tags.buildListTagsScript());
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
+  const names = result.map(t => t.name);
+  assert(names.includes("__MCPTEST__TagA"), `missing __MCPTEST__TagA: ${JSON.stringify(names.filter(n => n.includes("MCPTEST")))}`);
+  assert(names.includes("__MCPTEST__TagB"), `missing __MCPTEST__TagB`);
+});
+
+await test("list_folders: returns array including __MCPTEST__ folder", async () => {
+  const result = await runOmniJSJson(folders.buildListFoldersScript());
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
+  const names = result.map(f => f.name);
+  assert(names.includes("__MCPTEST__Folder"), `missing __MCPTEST__Folder`);
+});
+
+await test("list_projects: returns array including __MCPTEST__ project", async () => {
+  const result = await runOmniJSJson(projects.buildListProjectsScript({ limit: 200 }));
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
+  const names = result.map(p => p.name);
+  assert(names.includes("__MCPTEST__Project"), `missing __MCPTEST__Project`);
+});
+
+await test("list_tasks: returns array with limit", async () => {
+  const result = await runOmniJSJson(tasks.buildListTasksScript({ limit: 3 }));
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
+  assert(result.length <= 3, `expected at most 3, got ${result.length}`);
+});
+
+await test("get_task_count: returns count > 0", async () => {
+  const result = await runOmniJSJson(tasks.buildGetTaskCountScript({}));
+  assert(result.count > 0, `expected count > 0, got ${result.count}`);
+});
+
+await test("list_perspectives: returns non-empty array of custom perspectives", async () => {
+  const result = await runOmniJSJson(perspectives.buildListPerspectivesScript({}));
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
+  assert(result.length > 0, `expected non-empty array`);
+  assert(result[0].name, `expected perspective to have name`);
+});
+
+await test("get_perspective_tasks: works with first custom perspective", async () => {
+  const allPersp = await runOmniJSJson(perspectives.buildListPerspectivesScript({}));
+  assert(allPersp.length > 0, `no custom perspectives found`);
+  try {
+    const result = await runOmniJSJson(perspectives.buildGetPerspectiveTasksScript(allPersp[0].name));
+    assert(Array.isArray(result), `expected array, got ${typeof result}`);
+  } catch (e) {
+    if (e.message.includes("Cannot change perspectives while a sheet is presented")) {
+      console.log("    ⚠️  Skipped: OmniFocus has a sheet open. Close all dialogs and retry.");
+      return; // pass — not a code bug
+    }
+    throw e;
+  }
+});
+
+await test("get_inbox_tasks: returns array (empty inbox expected)", async () => {
+  const result = await runOmniJSJson(tasks.buildListTasksScript({ inInbox: true }));
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
+});
+
+await test("get_flagged_tasks: returns array", async () => {
+  const result = await runOmniJSJson(tasks.buildListTasksScript({ flagged: true }));
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
+});
+
+await test("get_review_queue: returns array", async () => {
+  const result = await runOmniJSJson(projects.buildGetReviewQueueScript());
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
+});
+
+await test("get_today_completed_tasks: returns array", async () => {
+  const result = await runOmniJSJson(tasks.buildGetTodayCompletedTasksScript());
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
+});
+
+await test("dump_database: returns structure with projects, folders, tags", async () => {
+  const result = await runOmniJSJson(database.buildDumpDatabaseScript({ maxTasks: 1, maxProjects: 1 }));
+  assert(result.projects !== undefined, `missing projects key`);
+  assert(result.folders !== undefined, `missing folders key`);
+  assert(result.tags !== undefined, `missing tags key`);
+});
+
+await test("save_database: completes without error", async () => {
+  const result = await runOmniJS(database.buildSaveDatabaseScript());
+  // save_database returns nothing meaningful, just verify no error
+  assert(true, "save completed");
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  PHASE 2: Single Task CRUD
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -193,6 +288,26 @@ await test("create_task: InboxTask (no project)", async () => {
   ids.inboxTask = result.id;
   assert(result.name === "__MCPTEST__InboxTask", `name=${result.name}`);
   assert(result.inInbox === true, `inInbox=${result.inInbox}`);
+});
+
+await test("get_inbox_tasks: verify InboxTask appears", async () => {
+  const result = await runOmniJSJson(tasks.buildListTasksScript({ inInbox: true }));
+  const names = result.map(t => t.name);
+  assert(names.includes("__MCPTEST__InboxTask"), `missing InboxTask in inbox: ${JSON.stringify(names)}`);
+});
+
+await test("get_flagged_tasks: verify Task1 appears (flagged)", async () => {
+  const result = await runOmniJSJson(tasks.buildListTasksScript({ flagged: true }));
+  const names = result.map(t => t.name);
+  assert(names.includes("__MCPTEST__Task1"), `missing flagged Task1: ${JSON.stringify(names.filter(n => n.includes("MCPTEST")))}`);
+});
+
+await test("get_project_tasks: verify tasks in __MCPTEST__Project", async () => {
+  const result = await runOmniJSJson(projects.buildGetProjectTasksScript({ projectId: ids.project }));
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
+  const names = result.map(t => t.name);
+  assert(names.includes("__MCPTEST__Task1"), `missing Task1 in project tasks`);
+  assert(names.includes("__MCPTEST__Task2"), `missing Task2 in project tasks`);
 });
 
 await test("update_task: Task1 — change name, note, clear dueDate, set estimatedMinutes", async () => {
@@ -258,27 +373,54 @@ await test("append_task_note: Task1", async () => {
 });
 
 await test("add_task_notification: Task1 absolute", async () => {
-  const result = await runOmniJSJson(tasks.buildAddTaskNotificationScript({
+  await runOmniJSJson(tasks.buildAddTaskNotificationScript({
     taskId: ids.task1,
     type: "absolute",
     absoluteDate: "2026-04-01T10:00:00Z",
   }));
-  // Now check notifications
   const notifs = await runOmniJSJson(tasks.buildListTaskNotificationsScript(ids.task1));
   assert(notifs.length > 0, `expected notifications, got ${notifs.length}`);
   ids.notificationId = notifs[0].id;
 });
 
-await test("remove_task_notification: Task1", async () => {
+await test("remove_task_notification: Task1 (absolute)", async () => {
   const result = await runOmniJSJson(tasks.buildRemoveTaskNotificationScript(ids.task1, ids.notificationId));
   assert(result.removed === true, `removed=${result.removed}`);
   const notifs = await runOmniJSJson(tasks.buildListTaskNotificationsScript(ids.task1));
   assert(notifs.length === 0, `expected 0 notifications, got ${notifs.length}`);
 });
 
+await test("add_task_notification: Task1 dueRelative (-3600s = 1hr before due)", async () => {
+  // Task1's dueDate was cleared; re-set it so dueRelative works
+  await runOmniJSJson(tasks.buildUpdateTaskScript({ id: ids.task1, dueDate: "2026-04-15T17:00:00Z" }));
+  await runOmniJSJson(tasks.buildAddTaskNotificationScript({
+    taskId: ids.task1,
+    type: "dueRelative",
+    relativeOffset: -3600,
+  }));
+  const notifs = await runOmniJSJson(tasks.buildListTaskNotificationsScript(ids.task1));
+  assert(notifs.length > 0, `expected dueRelative notification, got ${notifs.length}`);
+  const dueRelNotif = notifs.find(n => n.kind === "dueRelative");
+  assert(dueRelNotif, `expected a dueRelative notification, got kinds: ${JSON.stringify(notifs.map(n => n.kind))}`);
+  ids.dueRelNotifId = dueRelNotif.id;
+});
+
+await test("remove_task_notification: Task1 (dueRelative)", async () => {
+  const result = await runOmniJSJson(tasks.buildRemoveTaskNotificationScript(ids.task1, ids.dueRelNotifId));
+  assert(result.removed === true, `removed=${result.removed}`);
+  // Clear dueDate again to restore state
+  await runOmniJSJson(tasks.buildUpdateTaskScript({ id: ids.task1, dueDate: null }));
+});
+
 await test("complete_task: Task2", async () => {
   const result = await runOmniJSJson(tasks.buildCompleteTaskScript(ids.task2));
   assert(result.completed === true, `completed=${result.completed}`);
+});
+
+await test("get_today_completed_tasks: verify Task2 appears", async () => {
+  const result = await runOmniJSJson(tasks.buildGetTodayCompletedTasksScript());
+  const names = result.map(t => t.name);
+  assert(names.includes("__MCPTEST__Task2"), `missing Task2 in today's completed: ${JSON.stringify(names.filter(n => n.includes("MCPTEST")))}`);
 });
 
 await test("uncomplete_task: Task2", async () => {
@@ -423,6 +565,11 @@ await test("update_project: reactivate SAL", async () => {
     status: "active",
   }));
   assert(result.status === "active", `status=${result.status}`);
+});
+
+await test("mark_reviewed: Project", async () => {
+  const result = await runOmniJSJson(projects.buildMarkReviewedScript(ids.project));
+  assert(result.lastReviewDate !== null, `lastReviewDate should be set`);
 });
 
 await test("drop_project: SAL", async () => {
@@ -586,6 +733,6 @@ if (failed > 0) {
   });
   process.exit(1);
 } else {
-  console.log("🎉 All mutation tools passed smoke test!");
+  console.log("🎉 All tools passed smoke test!");
   process.exit(0);
 }
