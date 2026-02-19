@@ -1,6 +1,40 @@
-# omnifocus-mcp-server
+# OmniFocus MCP
 
-Feature-complete [Model Context Protocol](https://modelcontextprotocol.io/) server for [OmniFocus](https://www.omnigroup.com/omnifocus). Full CRUD access to tasks, projects, folders, tags, and perspectives — 50 tools, 2 resources, and 3 prompts.
+[![npm version](https://img.shields.io/npm/v/omnifocus-mcp-server.svg)](https://www.npmjs.com/package/omnifocus-mcp-server)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+> ✔️ Turn prompts into projects.
+
+Feature-complete [Model Context Protocol](https://modelcontextprotocol.io/) server for [OmniFocus](https://www.omnigroup.com/omnifocus). Full read/write access to tasks, projects, folders, tags, and perspectives — 50 tools, 2 resources, and 3 prompts.
+
+Uses [Omni Automation](https://omni-automation.com/) (OmniJS) under the hood, executing scripts via JXA and `osascript`. This is why macOS is required.
+
+![Demo](assets/demo.gif)
+
+## Table of Contents
+
+- [Examples](#examples)
+- [Install](#install)
+- [Requirements](#requirements)
+- [Security](#security)
+- [Tools](#tools)
+- [Resources](#resources)
+- [Prompts](#prompts)
+- [Troubleshooting](#troubleshooting)
+- [Development](#development)
+- [License](#license)
+
+## Examples
+
+> "Create a project called 'Q3 Launch' in my Work folder with subtasks for design review, copy writing, and QA — all due next Friday, assigned sequentially."
+
+> "What's overdue? Flag anything due this week that isn't flagged yet."
+
+> "Move all tasks tagged 'waiting' in the 'Website Redesign' project to a new 'Blocked' project."
+
+> "Run my weekly review — go through stale projects, process inbox, and summarize what needs attention."
+
+> "How many tasks do I have tagged 'errand'? List the ones that are available."
 
 ## Install
 
@@ -38,7 +72,8 @@ Or add to `.claude/settings.json`:
 }
 ```
 
-### Cursor
+<details>
+<summary><strong>Cursor</strong></summary>
 
 Add to `.cursor/mcp.json` in your project or `~/.cursor/mcp.json` globally:
 
@@ -53,7 +88,10 @@ Add to `.cursor/mcp.json` in your project or `~/.cursor/mcp.json` globally:
 }
 ```
 
-### Windsurf
+</details>
+
+<details>
+<summary><strong>Windsurf</strong></summary>
 
 Add to `~/.codeium/windsurf/mcp_config.json`:
 
@@ -68,7 +106,10 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 }
 ```
 
-### Codex CLI
+</details>
+
+<details>
+<summary><strong>Codex CLI</strong></summary>
 
 Add to `~/.codex/config.toml`:
 
@@ -78,7 +119,10 @@ command = "npx"
 args = ["-y", "omnifocus-mcp-server"]
 ```
 
-### Gemini CLI
+</details>
+
+<details>
+<summary><strong>Gemini CLI</strong></summary>
 
 Add to `~/.gemini/settings.json`:
 
@@ -93,6 +137,8 @@ Add to `~/.gemini/settings.json`:
 }
 ```
 
+</details>
+
 ## Requirements
 
 - macOS (OmniFocus is macOS-only)
@@ -100,7 +146,13 @@ Add to `~/.gemini/settings.json`:
 - Node.js >= 18
 - Automation permission granted in System Settings > Privacy & Security > Automation
 
-## Tools (50)
+## Security
+
+This server has **full read/write access** to your OmniFocus database. It can create, modify, and delete tasks, projects, folders, and tags. Only connect it to AI clients and models you trust.
+
+No data leaves your machine — all communication happens locally via `osascript`.
+
+## Tools
 
 ### Tasks (23)
 
@@ -124,7 +176,7 @@ Add to `~/.gemini/settings.json`:
 | `get_inbox_tasks` | Get all inbox tasks |
 | `get_flagged_tasks` | Get all available flagged tasks |
 | `get_today_completed_tasks` | Get tasks completed today |
-| `get_task_count` | Count tasks matching filters (faster than list) |
+| `get_task_count` | Count tasks matching filters — use instead of `list_tasks` when you only need a number, not the full task data |
 | `convert_task_to_project` | Convert a task into a project, preserving subtasks |
 | `batch_create_tasks` | Create multiple tasks at once with subtask hierarchies |
 | `batch_complete_tasks` | Complete multiple tasks at once |
@@ -193,9 +245,42 @@ Add to `~/.gemini/settings.json`:
 
 | Prompt | Description |
 |--------|-------------|
-| `weekly-review` | Guided weekly review of projects and tasks |
-| `inbox-processing` | Process inbox items using GTD methodology |
-| `daily-planning` | Plan today's tasks based on due dates, flags, and completions |
+| `weekly-review` | Walk through your GTD weekly review: check projects due for review, process leftover inbox items, reassess flagged tasks, and get a structured summary. Marks projects as reviewed when done. |
+| `inbox-processing` | Process inbox items one-by-one using GTD methodology — delete non-actionable items, do anything under 2 minutes, and organize the rest into projects with tags and dates. |
+| `daily-planning` | Build a prioritized plan for today based on due dates, flagged items, and what you've already completed. Surfaces overdue tasks and estimates your workload. |
+
+## Troubleshooting
+
+### "Not authorized" or no response from OmniFocus
+
+Make sure Automation permissions are granted. Go to **System Settings > Privacy & Security > Automation** and ensure your terminal app (Terminal, iTerm, etc.) is allowed to control OmniFocus.
+
+### Changes not taking effect after rebuild
+
+If you're developing locally, multiple MCP server processes may be running (from Claude Desktop, Claude Code, etc.). Kill them all and restart:
+
+```bash
+pkill -f "omnifocus-mcp-server"
+# or if running from source:
+pkill -f "omnifocus/mcp/dist/index.js"
+```
+
+### Stale `npx` cache
+
+If `npx` is running an old version, clear the cache:
+
+```bash
+npx clear-npx-cache
+# then re-run your MCP client
+```
+
+### OmniFocus 3 compatibility
+
+OmniFocus 3 works if Omni Automation is enabled. Go to **OmniFocus > Preferences > General** and check "Omni Automation". Some features (like certain perspective types) may behave differently.
+
+### Tool calls are slow
+
+Each tool call runs an `osascript` process to communicate with OmniFocus. This typically takes 200-500ms per call. Batch tools (`batch_create_tasks`, `batch_complete_tasks`, `batch_delete_tasks`) are much faster for bulk operations than calling individual tools in a loop.
 
 ## Development
 
@@ -214,6 +299,10 @@ Tests against a real OmniFocus instance (creates and cleans up test items):
 ```bash
 OMNIFOCUS_LIVE=1 npm run test:integration
 ```
+
+### Contributing
+
+PRs welcome. Please run `npm test` before submitting and include tests for new tools.
 
 ## License
 
