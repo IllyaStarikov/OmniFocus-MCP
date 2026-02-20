@@ -139,6 +139,17 @@ await test("create_project: Project in Folder, sequential, with TagA", async () 
   assert(tagNames.includes("__MCPTEST__TagA"), `tags=${JSON.stringify(tagNames)}`);
 });
 
+await test("create_project: Project with reviewInterval", async () => {
+  const result = await runOmniJSJson(projects.buildCreateProjectScript({
+    name: "__MCPTEST__ReviewedProject",
+    folderName: "__MCPTEST__Folder",
+    reviewInterval: { steps: 2, unit: "week" },
+  }));
+  ids.reviewedProject = result.id;
+  assert(result.name === "__MCPTEST__ReviewedProject", `name=${result.name}`);
+  assert(result.reviewInterval !== null, `reviewInterval should be set`);
+});
+
 await test("create_project: SAL in SubFolder, singleActionList", async () => {
   const result = await runOmniJSJson(projects.buildCreateProjectScript({
     name: "__MCPTEST__SAL",
@@ -176,6 +187,18 @@ await test("list_projects: returns array including __MCPTEST__ project", async (
   assert(Array.isArray(result), `expected array, got ${typeof result}`);
   const names = result.map(p => p.name);
   assert(names.includes("__MCPTEST__Project"), `missing __MCPTEST__Project`);
+});
+
+await test("get_project: by ID", async () => {
+  const result = await runOmniJSJson(projects.buildGetProjectScript(ids.project));
+  assert(result.name === "__MCPTEST__Project", `name=${result.name}`);
+  assert(result.id === ids.project, `id=${result.id}`);
+});
+
+await test("get_project: by name", async () => {
+  const result = await runOmniJSJson(projects.buildGetProjectScript("__MCPTEST__Project"));
+  assert(result.id === ids.project, `id mismatch: expected ${ids.project}, got ${result.id}`);
+  assert(result.name === "__MCPTEST__Project", `name=${result.name}`);
 });
 
 await test("list_tasks: returns array with limit", async () => {
@@ -244,6 +267,71 @@ await test("save_database: completes without error", async () => {
   assert(true, "save completed");
 });
 
+await test("list_tasks: with taskStatus 'available'", async () => {
+  const result = await runOmniJSJson(tasks.buildListTasksScript({ taskStatus: "available", limit: 5 }));
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
+});
+
+await test("list_tasks: with taskStatus 'remaining'", async () => {
+  const result = await runOmniJSJson(tasks.buildListTasksScript({ taskStatus: "remaining", limit: 5 }));
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
+});
+
+await test("list_tasks: with search text", async () => {
+  const result = await runOmniJSJson(tasks.buildListTasksScript({ search: "__MCPTEST__", limit: 10 }));
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
+});
+
+await test("list_tasks: with date filters (dueAfter/dueBefore)", async () => {
+  const result = await runOmniJSJson(tasks.buildListTasksScript({
+    dueAfter: "2020-01-01T00:00:00Z",
+    dueBefore: "2030-12-31T23:59:59Z",
+    limit: 5,
+  }));
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
+});
+
+await test("list_tasks: with projectId filter", async () => {
+  const result = await runOmniJSJson(tasks.buildListTasksScript({ projectId: ids.project, limit: 10 }));
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
+});
+
+await test("get_task_count: with flagged filter", async () => {
+  const result = await runOmniJSJson(tasks.buildGetTaskCountScript({ flagged: true }));
+  assert(typeof result.count === "number", `expected count to be number, got ${typeof result.count}`);
+});
+
+await test("get_task_count: with projectName filter", async () => {
+  const result = await runOmniJSJson(tasks.buildGetTaskCountScript({ projectName: "__MCPTEST__Project" }));
+  assert(typeof result.count === "number", `expected count to be number, got ${typeof result.count}`);
+});
+
+await test("list_projects: with search filter", async () => {
+  const result = await runOmniJSJson(projects.buildListProjectsScript({ search: "__MCPTEST__" }));
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
+  assert(result.length > 0, `expected at least 1 matching project`);
+});
+
+await test("list_projects: with offset", async () => {
+  const result = await runOmniJSJson(projects.buildListProjectsScript({ limit: 5, offset: 0 }));
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
+});
+
+await test("dump_database: with includeCompleted", async () => {
+  const result = await runOmniJSJson(database.buildDumpDatabaseScript({ includeCompleted: true }));
+  assert(result.projects !== undefined, `missing projects key`);
+});
+
+await test("dump_database: with maxDepth", async () => {
+  const result = await runOmniJSJson(database.buildDumpDatabaseScript({ maxDepth: 1 }));
+  assert(result.tags !== undefined, `missing tags key`);
+});
+
+await test("dump_database: with hideRecurringDuplicates", async () => {
+  const result = await runOmniJSJson(database.buildDumpDatabaseScript({ hideRecurringDuplicates: true }));
+  assert(result.inbox !== undefined, `missing inbox key`);
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  PHASE 2: Single Task CRUD
 // ═══════════════════════════════════════════════════════════════════════════
@@ -290,6 +378,26 @@ await test("create_task: InboxTask (no project)", async () => {
   assert(result.inInbox === true, `inInbox=${result.inInbox}`);
 });
 
+await test("create_task: Task with repetitionRule", async () => {
+  const result = await runOmniJSJson(tasks.buildCreateTaskScript({
+    name: "__MCPTEST__RecurringTask",
+    projectName: "__MCPTEST__Project",
+    repetitionRule: { ruleString: "FREQ=WEEKLY;INTERVAL=1", method: "fixed" },
+    dueDate: "2026-06-01T17:00:00Z",
+  }));
+  ids.recurringTask = result.id;
+  assert(result.name === "__MCPTEST__RecurringTask", `name=${result.name}`);
+  assert(result.repetitionRule !== null, `repetitionRule should be set`);
+  assert(result.repetitionRule.ruleString === "FREQ=WEEKLY;INTERVAL=1", `ruleString=${result.repetitionRule.ruleString}`);
+  assert(result.repetitionRule.method === "fixed", `method=${result.repetitionRule.method}`);
+});
+
+await test("get_task: with maxDepth", async () => {
+  const result = await runOmniJSJson(tasks.buildGetTaskScript({ id: ids.task1, includeChildren: true, maxDepth: 2 }));
+  assert(result.id === ids.task1, `id mismatch`);
+  assert(result.children !== undefined, `children should be present`);
+});
+
 await test("get_inbox_tasks: verify InboxTask appears", async () => {
   const result = await runOmniJSJson(tasks.buildListTasksScript({ inInbox: true }));
   const names = result.map(t => t.name);
@@ -308,6 +416,11 @@ await test("get_project_tasks: verify tasks in __MCPTEST__Project", async () => 
   const names = result.map(t => t.name);
   assert(names.includes("__MCPTEST__Task1"), `missing Task1 in project tasks`);
   assert(names.includes("__MCPTEST__Task2"), `missing Task2 in project tasks`);
+});
+
+await test("get_project_tasks: with includeCompleted=true", async () => {
+  const result = await runOmniJSJson(projects.buildGetProjectTasksScript({ projectId: ids.project, includeCompleted: true }));
+  assert(Array.isArray(result), `expected array, got ${typeof result}`);
 });
 
 await test("update_task: Task1 — change name, note, clear dueDate, set estimatedMinutes", async () => {
@@ -438,6 +551,40 @@ await test("drop_task: InboxTask", async () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 console.log("\n🔀 Phase 3: Subtasks, Batch, Move, Duplicate");
+
+await test("batch_create_tasks: with parentTaskId", async () => {
+  // Create a parent task first, then add subtasks via parentTaskId
+  const parentResult = await runOmniJSJson(tasks.buildCreateTaskScript({
+    name: "__MCPTEST__BatchParent",
+    projectName: "__MCPTEST__Project",
+  }));
+  ids.batchParent = parentResult.id;
+  const subtaskResult = await runOmniJSJson(tasks.buildBatchCreateTasksScript({
+    tasks: [{ name: "__MCPTEST__BatchSub1" }, { name: "__MCPTEST__BatchSub2" }],
+    parentTaskId: ids.batchParent,
+  }));
+  assert(subtaskResult.length >= 2, `expected at least 2 tasks, got ${subtaskResult.length}`);
+  // Verify parent has children
+  const parentDetail = await runOmniJSJson(tasks.buildGetTaskScript({ id: ids.batchParent, includeChildren: true }));
+  assert(parentDetail.children && parentDetail.children.length >= 2, `expected at least 2 children, got ${(parentDetail.children || []).length}`);
+  // Clean up: delete batchParent (will also remove children)
+  await runOmniJSJson(tasks.buildDeleteTaskScript(ids.batchParent));
+});
+
+await test("move_tasks: with projectId destination", async () => {
+  // Move recurringTask to SAL by project ID
+  await runOmniJSJson(tasks.buildMoveTasksScript({
+    taskIds: [ids.recurringTask],
+    projectId: ids.sal,
+  }));
+  const moved = await runOmniJSJson(tasks.buildGetTaskScript({ id: ids.recurringTask }));
+  assert(moved.containingProjectName === "__MCPTEST__SAL", `expected SAL, got ${moved.containingProjectName}`);
+  // Move back to Project
+  await runOmniJSJson(tasks.buildMoveTasksScript({
+    taskIds: [ids.recurringTask],
+    projectName: "__MCPTEST__Project",
+  }));
+});
 
 await test("batch_create_tasks: Parent with 2 children", async () => {
   const result = await runOmniJSJson(tasks.buildBatchCreateTasksScript({
@@ -661,7 +808,7 @@ if (remainingTaskIds.length > 0) {
 }
 
 // Delete projects
-const projectsToDelete = [ids.project, ids.sal, ids.convertedProject].filter(Boolean);
+const projectsToDelete = [ids.project, ids.sal, ids.convertedProject, ids.reviewedProject].filter(Boolean);
 for (const pid of projectsToDelete) {
   await test(`cleanup: delete project ${pid}`, async () => {
     try {
