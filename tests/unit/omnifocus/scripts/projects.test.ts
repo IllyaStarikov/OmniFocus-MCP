@@ -28,6 +28,21 @@ describe("project script builders", () => {
       expect(script).toContain("Project.Status.Active");
     });
 
+    it("should include onHold status filter", () => {
+      const script = buildListProjectsScript({ status: "onHold" });
+      expect(script).toContain("Project.Status.OnHold");
+    });
+
+    it("should include done status filter", () => {
+      const script = buildListProjectsScript({ status: "done" });
+      expect(script).toContain("Project.Status.Done");
+    });
+
+    it("should include dropped status filter", () => {
+      const script = buildListProjectsScript({ status: "dropped" });
+      expect(script).toContain("Project.Status.Dropped");
+    });
+
     it("should include folder filter by ID", () => {
       const script = buildListProjectsScript({ folderId: "folder-123" });
       expect(script).toContain("folder-123");
@@ -101,7 +116,7 @@ describe("project script builders", () => {
         reviewInterval: { steps: 2, unit: "weeks" },
       });
       expect(script).toContain("reviewInterval");
-      expect(script).toContain("ReviewInterval");
+      expect(script).toContain("ri.steps = args.reviewInterval.steps");
     });
 
     it("should handle tags", () => {
@@ -109,6 +124,11 @@ describe("project script builders", () => {
       expect(script).toContain("work");
       expect(script).toContain("urgent");
       expect(script).toContain("addTag");
+    });
+
+    it("should handle completedByChildren", () => {
+      const script = buildCreateProjectScript({ name: "Test", completedByChildren: true });
+      expect(script).toContain("completedByChildren");
     });
   });
 
@@ -124,12 +144,29 @@ describe("project script builders", () => {
       expect(script).toContain("Project.Status.OnHold");
     });
 
+    it("should handle all status transitions", () => {
+      expect(buildUpdateProjectScript({ id: "proj-123", status: "active" })).toContain("Project.Status.Active");
+      expect(buildUpdateProjectScript({ id: "proj-123", status: "done" })).toContain("Project.Status.Done");
+      expect(buildUpdateProjectScript({ id: "proj-123", status: "dropped" })).toContain("Project.Status.Dropped");
+    });
+
     it("should handle review interval update", () => {
       const script = buildUpdateProjectScript({
         id: "proj-123",
         reviewInterval: { steps: 1, unit: "months" },
       });
-      expect(script).toContain("ReviewInterval");
+      expect(script).toContain("ri.steps = args.reviewInterval.steps");
+    });
+
+    it("should handle clearing dates with null", () => {
+      const script = buildUpdateProjectScript({ id: "proj-123", dueDate: null, deferDate: null });
+      expect(script).toContain("dueDate");
+      expect(script).toContain("deferDate");
+    });
+
+    it("should handle singleActionList update", () => {
+      const script = buildUpdateProjectScript({ id: "proj-123", singleActionList: true });
+      expect(script).toContain("containsSingletonActions");
     });
   });
 

@@ -94,7 +94,10 @@ export function buildCreateProjectScript(args: CreateProjectArgs): string {
   if (args.flagged !== undefined) project.flagged = args.flagged;
 
   if (args.reviewInterval) {
-    project.reviewInterval = new Project.ReviewInterval(args.reviewInterval.steps, args.reviewInterval.unit);
+    var ri = project.reviewInterval;
+    ri.steps = args.reviewInterval.steps;
+    ri.unit = args.reviewInterval.unit;
+    project.reviewInterval = ri;
   }
 
   if (args.tags && args.tags.length > 0) {
@@ -139,7 +142,10 @@ export function buildUpdateProjectScript(args: UpdateProjectArgs): string {
   else if (args.status === "dropped") project.status = Project.Status.Dropped;
 
   if (args.reviewInterval) {
-    project.reviewInterval = new Project.ReviewInterval(args.reviewInterval.steps, args.reviewInterval.unit);
+    var ri = project.reviewInterval;
+    ri.steps = args.reviewInterval.steps;
+    ri.unit = args.reviewInterval.unit;
+    project.reviewInterval = ri;
   }
 
   return JSON.stringify(serializeProject(project));
