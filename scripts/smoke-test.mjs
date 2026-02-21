@@ -9,6 +9,8 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
+const VERBOSE = process.argv.includes("--verbose") || process.argv.includes("-v");
+
 // ─── OmniJS executor (same as executor.ts) ──────────────────────────────
 
 const OMNIJS_PRELUDE = `function byId(collection, id) {
@@ -34,7 +36,11 @@ async function runOmniJS(omniScript) {
 
 async function runOmniJSJson(omniScript) {
   const raw = await runOmniJS(omniScript);
-  return JSON.parse(raw);
+  const parsed = JSON.parse(raw);
+  if (VERBOSE) {
+    console.log("    ↳ " + JSON.stringify(parsed, null, 2).split("\n").join("\n      "));
+  }
+  return parsed;
 }
 
 // ─── Import script builders ─────────────────────────────────────────────
@@ -148,6 +154,8 @@ await test("create_project: Project with reviewInterval", async () => {
   ids.reviewedProject = result.id;
   assert(result.name === "__MCPTEST__ReviewedProject", `name=${result.name}`);
   assert(result.reviewInterval !== null, `reviewInterval should be set`);
+  assert(result.reviewInterval.steps === 2, `reviewInterval.steps expected 2, got ${result.reviewInterval.steps}`);
+  assert(result.reviewInterval.unit === "weeks", `reviewInterval.unit expected "weeks", got ${result.reviewInterval.unit}`);
 });
 
 await test("create_project: SAL in SubFolder, singleActionList", async () => {
@@ -515,6 +523,7 @@ await test("add_task_notification: Task1 dueRelative (-3600s = 1hr before due)",
   assert(notifs.length > 0, `expected dueRelative notification, got ${notifs.length}`);
   const dueRelNotif = notifs.find(n => n.kind === "dueRelative");
   assert(dueRelNotif, `expected a dueRelative notification, got kinds: ${JSON.stringify(notifs.map(n => n.kind))}`);
+  assert(dueRelNotif.relativeFireOffset === -3600, `expected relativeFireOffset=-3600, got ${dueRelNotif.relativeFireOffset}`);
   ids.dueRelNotifId = dueRelNotif.id;
 });
 

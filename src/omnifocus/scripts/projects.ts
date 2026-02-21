@@ -96,7 +96,8 @@ export function buildCreateProjectScript(args: CreateProjectArgs): string {
   if (args.reviewInterval) {
     var ri = project.reviewInterval;
     ri.steps = args.reviewInterval.steps;
-    ri.unit = args.reviewInterval.unit;
+    var u = args.reviewInterval.unit;
+    ri.unit = u.endsWith("s") ? u : u + "s";
     project.reviewInterval = ri;
   }
 
@@ -144,7 +145,8 @@ export function buildUpdateProjectScript(args: UpdateProjectArgs): string {
   if (args.reviewInterval) {
     var ri = project.reviewInterval;
     ri.steps = args.reviewInterval.steps;
-    ri.unit = args.reviewInterval.unit;
+    var u = args.reviewInterval.unit;
+    ri.unit = u.endsWith("s") ? u : u + "s";
     project.reviewInterval = ri;
   }
 

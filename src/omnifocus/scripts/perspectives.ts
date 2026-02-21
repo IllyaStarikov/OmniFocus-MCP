@@ -34,31 +34,32 @@ export function buildGetPerspectiveTasksScript(name: string): string {
   // NOTE: This mutates the user's active OmniFocus window by changing its perspective.
   // Save and restore the original perspective to minimize disruption.
   var originalPerspective = win.perspective;
-  win.perspective = perspectives[0];
+  try {
+    win.perspective = perspectives[0];
 
-  // Read content after perspective switch
-  var content = win.content;
-  if (!content || !content.trees || content.trees.length === 0) {
-    return JSON.stringify([]);
-  }
+    // Read content after perspective switch
+    var content = win.content;
+    if (!content || !content.trees || content.trees.length === 0) {
+      return JSON.stringify([]);
+    }
 
-  var tasks = [];
-  function collectTasks(trees) {
-    for (var i = 0; i < trees.length; i++) {
-      var node = trees[i];
-      if (node.value && node.value.constructor === Task) {
-        tasks.push(serializeTask(node.value));
-      }
-      if (node.children && node.children.length > 0) {
-        collectTasks(node.children);
+    var tasks = [];
+    function collectTasks(trees) {
+      for (var i = 0; i < trees.length; i++) {
+        var node = trees[i];
+        if (node.value && node.value.constructor === Task) {
+          tasks.push(serializeTask(node.value));
+        }
+        if (node.children && node.children.length > 0) {
+          collectTasks(node.children);
+        }
       }
     }
+    collectTasks(content.trees);
+
+    return JSON.stringify(tasks);
+  } finally {
+    win.perspective = originalPerspective;
   }
-  collectTasks(content.trees);
-
-  // Restore the original perspective
-  if (originalPerspective) win.perspective = originalPerspective;
-
-  return JSON.stringify(tasks);
 })()`;
 }

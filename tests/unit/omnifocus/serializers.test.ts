@@ -278,7 +278,7 @@ describe("serializer templates", () => {
 
     it("should handle dueRelative notification type", () => {
       expect(serializeTaskNotificationFn).toContain('kind === "dueRelative"');
-      expect(serializeTaskNotificationFn).toContain("relativeFireDate");
+      expect(serializeTaskNotificationFn).toContain("relativeFireOffset");
     });
 
     it("should use _notifKindMap", () => {

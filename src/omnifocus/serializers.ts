@@ -184,7 +184,7 @@ function serializeTaskNotification(notif) {
   if (kind === "absolute") {
     try { absDate = notif.absoluteFireDate ? notif.absoluteFireDate.toISOString() : null; } catch(e) {}
   } else if (kind === "dueRelative") {
-    try { relOffset = notif.relativeFireDate !== null ? notif.relativeFireDate : null; } catch(e) {}
+    try { relOffset = notif.relativeFireOffset !== null ? notif.relativeFireOffset : null; } catch(e) {}
   }
   return {
     id: notif.id.primaryKey,
